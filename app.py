@@ -27,7 +27,9 @@ authenticator = stauth.Authenticate(
 )
 
 # Giriş formunu ekranda göster
-name, authentication_status, username = authenticator.login('Giriş Yap', 'main')
+# Eski hali: name, authentication_status, username = authenticator.login('Giriş Yap', 'main')
+# Yeni hali:
+authentication_status = authenticator.login(location='main')
 
 # --- UYGULAMA MANTIĞI ---
 if authentication_status:
@@ -107,5 +109,6 @@ elif authentication_status == False:
     st.error('Kullanıcı adı veya şifre hatalı')
 elif authentication_status == None:
     st.warning('Lütfen kullanıcı adı ve şifrenizi giriniz')
+
 
 
