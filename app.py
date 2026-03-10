@@ -8,9 +8,16 @@ import cv2
 import pandas as pd
 
 # --- GİRİŞ SİSTEMİ AYARLARI ---
-# Hata Çözümü: st.secrets'ı tamamen bağımsız bir JSON gibi kopyalıyoruz
-import json
-credentials_data = json.loads(json.dumps(st.secrets['credentials']))
+# Hata Çözümü: Veriyi manuel bir sözlüğe dökerek tüm bağları koparıyoruz
+raw_creds = st.secrets['credentials']
+credentials_data = {
+    "usernames": {
+        user: {
+            "name": data["name"],
+            "password": data["password"]
+        } for user, data in raw_creds["usernames"].items()
+    }
+}
 
 authenticator = stauth.Authenticate(
     credentials_data,
@@ -100,4 +107,5 @@ elif authentication_status == False:
     st.error('Kullanıcı adı veya şifre hatalı')
 elif authentication_status == None:
     st.warning('Lütfen kullanıcı adı ve şifrenizi giriniz')
+
 
