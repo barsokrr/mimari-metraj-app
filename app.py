@@ -90,11 +90,20 @@ except KeyError:
                         
                 except Exception as e:
                     st.error(f"Analiz sırasında bir hata oluştu: {e}")
-
+# --- KİMLİK DOĞRULAMA KONTROLÜ ---
+if st.session_state.get("authentication_status"):
+    # Giriş başarılıysa logout butonu ve ana uygulama içeriği buraya gelir
+    authenticator.logout('Çıkış Yap', 'sidebar')
+    st.write(f'Hoş geldin *{st.session_state["name"]}*')
+    
+    # Buradan sonra senin metraj hesaplama kodların (st.file_uploader vb.) devam etmeli
+    
 elif st.session_state.get("authentication_status") is False:
     st.error('Kullanıcı adı veya şifre hatalı')
+    
 else:
     st.info('Lütfen kullanıcı adı ve şifrenizi giriniz')
+
 
 
 
