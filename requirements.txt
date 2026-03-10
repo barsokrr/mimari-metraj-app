@@ -1,8 +1,6 @@
 streamlit
 streamlit-authenticator
-roboflow
 inference-sdk
 opencv-python-headless
 pandas
-openpyxl
 pyyaml
