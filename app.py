@@ -29,7 +29,6 @@ st.title("🏗️ Mimari Plan Duvar Metraj Uygulaması")
 st.write(f"Hoş geldin *{st.session_state['name']}*")
 st.write("Planınızı yükleyin, duvarları otomatik tespit edelim.")
 
-# Secrets içindeki anahtara erişim
 API_KEY = st.secrets["ROBOFLOW_API_KEY"]
 WORKSPACE = "bars-workspace-tcviv"
 WORKFLOW = "custom-workflow-2"
@@ -45,7 +44,7 @@ if uploaded_file is not None:
 
     col1, col2 = st.columns(2)
     with col1:
-        st.image(image, caption="Yüklenen Plan", use_column_width=True)
+        st.image(image, caption="Yüklenen Plan", use_container_width=True)
 
     if st.button("Metrajı Hesapla ve Analiz Et"):
         with st.spinner('Model analiz ediyor...'):
@@ -76,7 +75,7 @@ if uploaded_file is not None:
                 cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 3)
 
             with col2:
-                st.image(image, caption="Analiz Sonucu", use_column_width=True)
+                st.image(image, caption="Analiz Sonucu", use_container_width=True)
 
             st.write("### Metraj Sonuçları")
             st.dataframe(pd.DataFrame(metraj_listesi))
