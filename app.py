@@ -23,20 +23,22 @@ authenticator = stauth.Authenticate(
     st.secrets['cookie']['key'],
     st.secrets['cookie']['expiry_days']
 )
+# --- GİRİŞ PANELİ ---
+# Kütüphanenin yeni versiyonuna göre bu şekilde çağırıyoruz
+authenticator.login(location='main')
 
-# Giriş panelini çağır
-authentication_status = authenticator.login(location='main')
-
-# --- UYGULAMA İÇERİĞİ (Sadece Giriş Yapılınca Görünür) ---
-if authentication_status:
-    # Çıkış butonu
+# --- İÇERİĞİ GÖSTERME ŞARTI ---
+# Giriş durumu Streamlit hafızasından (session_state) kontrol ediliyor
+if st.session_state.get("authentication_status"):
+    # Çıkış butonu yan menüye (sidebar) ekleniyor
     authenticator.logout('Çıkış Yap', 'sidebar')
     
+    # Başlıklar
     st.title("🏗️ Mimari Plan Duvar Metraj Uygulaması")
     st.write(f"Hoş geldin *{st.session_state['name']}*")
     st.write("Planınızı yükleyin, duvarları otomatik tespit edelim.")
-
-    # Roboflow Ayarları
+    
+    # --- MODEL VE ANALİZ KODLARI ---
     API_KEY = st.secrets["ROBOFLOW_API_KEY"]
     WORKSPACE = "bars-workspace-tcviv"
     WORKFLOW = "custom-workflow-2"
@@ -44,7 +46,7 @@ if authentication_status:
 
     client = InferenceHTTPClient(api_url="https://serverless.roboflow.com", api_key=API_KEY)
 
-    # Dosya Yükleme
+    # Dosya Yükleme Alanı
     uploaded_file = st.file_uploader("Mimari Planı Seçin (JPG, PNG)...", type=["jpg", "jpeg", "png"])
 
     if uploaded_file is not None:
@@ -56,7 +58,7 @@ if authentication_status:
             st.image(image, caption="Yüklenen Plan", use_column_width=True)
 
         if st.button("Metrajı Hesapla ve Analiz Et"):
-            with st.spinner('Analiz ediliyor...'):
+            with st.spinner('Model analiz ediyor, lütfen bekleyin...'):
                 cv2.imwrite("temp.jpg", image)
                 result = client.run_workflow(
                     workspace_name=WORKSPACE,
@@ -69,7 +71,8 @@ if authentication_status:
 
                 for i, wall in enumerate(predictions):
                     x, y, w, h = wall['x'], wall['y'], wall['width'], wall['height']
-                    m_w, m_h = round(w * PIXEL_TO_METER_RATIO, 2), round(h * PIXEL_TO_METER_RATIO, 2)
+                    m_w = round(w * PIXEL_TO_METER_RATIO, 2)
+                    m_h = round(h * PIXEL_TO_METER_RATIO, 2)
 
                     metraj_listesi.append({
                         "Duvar_ID": f"Duvar-{i+1}",
@@ -77,7 +80,7 @@ if authentication_status:
                         "Yükseklik (m)": m_h,
                         "Alan (m2)": round(m_w * m_h, 2)
                     })
-                    
+
                     x1, y1 = int(x - w/2), int(y - h/2)
                     x2, y2 = int(x + w/2), int(y + h/2)
                     cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 3)
@@ -92,9 +95,14 @@ if authentication_status:
                 towrite = io.BytesIO()
                 df.to_excel(towrite, index=False, engine='openpyxl')
                 towrite.seek(0)
-                st.download_button("📥 Excel İndir", towrite, "metraj.xlsx", "application/vnd.ms-excel")
+                st.download_button(
+                    label="📥 Excel Listesini İndir",
+                    data=towrite,
+                    file_name="mimari_metraj.xlsx",
+                    mime="application/vnd.ms-excel"
+                )
 
-elif authentication_status == False:
+elif st.session_state.get("authentication_status") is False:
     st.error('Kullanıcı adı veya şifre hatalı')
-elif authentication_status == None:
+elif st.session_state.get("authentication_status") is None:
     st.warning('Lütfen kullanıcı adı ve şifrenizi giriniz')
