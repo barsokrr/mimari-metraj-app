@@ -31,7 +31,7 @@ if st.session_state.get("authentication_status"):
     
     # API Anahtarını alırken hata almamak için güvenli yöntem
     try:
-        API_KEY = st.secrets["my238ZSyFyxbwEVQHISP"]
+        API_KEY = st.secrets["ROBOFLOW_API_KEY"]
     except KeyError:
         st.error("Hata: Secrets ayarlarında 'ROBOFLOW_API_KEY' bulunamadı.")
         st.stop()
@@ -94,4 +94,5 @@ elif st.session_state.get("authentication_status") is False:
     st.error('Kullanıcı adı veya şifre hatalı')
 else:
     st.info('Lütfen kullanıcı adı ve şifrenizi giriniz')
+
 
