@@ -22,14 +22,13 @@ if authentication_status:
         # BURADAN SONRA SENİN MEVCUT KODLARIN GELMELİ (st.title, Roboflow bağlantısı vb.)
         st.title("🏗️ Mimari Plan Duvar Metraj Uygulaması")
         # ... (diğer kodların)
-    
-    elif authentication_status == False:
+elif authentication_status == False:
         st.error('Kullanıcı adı veya şifre hatalı')
-    elif authentication_status == None:
+elif authentication_status == None:
         st.warning('Lütfen kullanıcı adı ve şifrenizi giriniz')
-    import numpy as np
-    from inference_sdk import InferenceHTTPClient
-    import io
+import numpy as np
+from inference_sdk import InferenceHTTPClient
+import io
     
     # Sayfa Ayarları
     st.set_page_config(page_title="Mimari Metraj Otomasyonu", layout="wide")
@@ -47,7 +46,7 @@ if authentication_status:
     # 2. Dosya Yükleme Alanı
     uploaded_file = st.file_uploader("Mimari Planı Seçin (JPG, PNG)...", type=["jpg", "jpeg", "png"])
     
-    if uploaded_file is not None:
+if uploaded_file is not None:
         # Resmi oku
         file_bytes = np.asarray(bytearray(uploaded_file.read()), dtype=np.uint8)
         image = cv2.imdecode(file_bytes, 1)
@@ -57,7 +56,7 @@ if authentication_status:
         with col1:
             st.image(image, caption="Yüklenen Plan", use_column_width=True)
         
-        if st.button("Metrajı Hesapla ve Analiz Et"):
+if st.button("Metrajı Hesapla ve Analiz Et"):
             with st.spinner('Model analiz ediyor, lütfen bekleyin...'):
                 # Roboflow Analizi
                 # Not: Geçici olarak dosyayı kaydedip gönderiyoruz
