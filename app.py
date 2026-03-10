@@ -34,7 +34,8 @@ authentication_status = authenticator.login(location='main')
 # --- UYGULAMA MANTIĞI ---
 if authentication_status:
     authenticator.logout('Çıkış Yap', 'sidebar')
-    st.write(f'Hoş geldin *{name}*')
+    # st.session_state içinde saklanan ismi kullanıyoruz
+    st.write(f"Hoş geldin *{st.session_state['name']}*")
 
     # Sayfa Ayarları
     st.title("🏗️ Mimari Plan Duvar Metraj Uygulaması")
@@ -109,6 +110,7 @@ elif authentication_status == False:
     st.error('Kullanıcı adı veya şifre hatalı')
 elif authentication_status == None:
     st.warning('Lütfen kullanıcı adı ve şifrenizi giriniz')
+
 
 
 
