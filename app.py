@@ -1,17 +1,9 @@
 import streamlit as st
 import streamlit_authenticator as stauth
-import cv2
-import pandas as pd
-import numpy as np
-from inference_sdk import InferenceHTTPClient
-import io
-import copy
+import copy # Bu kütüphaneyi ekle
 
-# 1. AYARLAR (Mutlaka en üstte ve boşluksuz)
-st.set_page_config(page_title="Mimari Metraj Otomasyonu", layout="wide")
-
-# 2. GÜVENLİ GİRİŞ SİSTEMİ
-# TypeError hatasını engellemek için copy kullanıyoruz
+# Hata Çözümü: st.secrets içeriğini kopyalayarak üzerinde işlem yapılabilir hale getiriyoruz
+# Bu işlem image_6bf7be.png hatasını engeller.
 credentials = copy.deepcopy(st.secrets['credentials'])
 
 authenticator = stauth.Authenticate(
@@ -19,7 +11,6 @@ authenticator = stauth.Authenticate(
     st.secrets['cookie']['name'],
     st.secrets['cookie']['key'],
     st.secrets['cookie']['expiry_days']
-)
 
 name, authentication_status, username = authenticator.login('Giriş Yap', 'main')
 
@@ -103,3 +94,4 @@ elif authentication_status == False:
     st.error('Hatalı giriş')
 elif authentication_status == None:
     st.warning('Lütfen giriş yapın')
+
