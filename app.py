@@ -29,6 +29,7 @@ st.title("🏗️ Mimari Plan Duvar Metraj Uygulaması")
 st.write(f"Hoş geldin *{st.session_state['name']}*")
 st.write("Planınızı yükleyin, duvarları otomatik tespit edelim.")
 
+# Secrets içindeki anahtara erişim
 API_KEY = st.secrets["ROBOFLOW_API_KEY"]
 WORKSPACE = "bars-workspace-tcviv"
 WORKFLOW = "custom-workflow-2"
@@ -36,7 +37,7 @@ PIXEL_TO_METER_RATIO = 0.02
 
 client = InferenceHTTPClient(api_url="[https://serverless.roboflow.com](https://serverless.roboflow.com)", api_key=API_KEY)
 
-uploaded_file = st.file_uploader("Mimari Planı Seçin (JPG, PNG)...", type=["jpg", "jpeg", "png"])
+uploaded_file = st.file_uploader("Mimari Planı Seçin...", type=["jpg", "jpeg", "png"])
 
 if uploaded_file is not None:
     file_bytes = np.asarray(bytearray(uploaded_file.read()), dtype=np.uint8)
@@ -47,7 +48,7 @@ if uploaded_file is not None:
         st.image(image, caption="Yüklenen Plan", use_column_width=True)
 
     if st.button("Metrajı Hesapla ve Analiz Et"):
-        with st.spinner('Model analiz ediyor, lütfen bekleyin...'):
+        with st.spinner('Model analiz ediyor...'):
             cv2.imwrite("temp.jpg", image)
             result = client.run_workflow(
                 workspace_name=WORKSPACE,
@@ -75,18 +76,7 @@ if uploaded_file is not None:
                 cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 3)
 
             with col2:
-                st.image(image, caption="Tespit Edilen Alanlar", use_column_width=True)
+                st.image(image, caption="Analiz Sonucu", use_column_width=True)
 
-            df = pd.DataFrame(metraj_listesi)
             st.write("### Metraj Sonuçları")
-            st.dataframe(df)
-
-            towrite = io.BytesIO()
-            df.to_excel(towrite, index=False, engine='openpyxl')
-            towrite.seek(0)
-            st.download_button(
-                label="📥 Excel Listesini İndir",
-                data=towrite,
-                file_name="mimari_metraj.xlsx",
-                mime="application/vnd.ms-excel"
-            )
+            st.dataframe(pd.DataFrame(metraj_listesi))
