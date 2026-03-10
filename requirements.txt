@@ -4,4 +4,4 @@ inference-sdk
 pandas
 openpyxl
 numpy<2.0.0
-
+streamlit-authenticator==0.3.2
