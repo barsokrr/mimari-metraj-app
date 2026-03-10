@@ -11,9 +11,6 @@ st.set_page_config(page_title="Mimari Metraj Otomasyonu", layout="wide")
 st.title("🏗️ Mimari Plan Duvar Metraj Uygulaması")
 st.write("Planınızı yükleyin, duvarları otomatik tespit edelim ve metrajı Excel olarak verelim.")
 
-# 1. Ayarlar (Senin bilgilerini buraya sabitliyoruz)
-# Eski hali: API_KEY = "my238ZSyFyxbwEVQHISP"
-# Yeni ve güvenli hali:
 API_KEY = st.secrets["ROBOFLOW_API_KEY"]
 WORKSPACE = "bars-workspace-tcviv"
 WORKFLOW = "custom-workflow-2"
@@ -87,4 +84,5 @@ if uploaded_file is not None:
                 mime="application/vnd.ms-excel"
             )
             st.success(f"Analiz tamamlandı! {len(predictions)} adet alan tespit edildi.")
+
 
