@@ -1,7 +1,8 @@
 streamlit
-opencv-python-headless
+streamlit-authenticator
+roboflow
 inference-sdk
+opencv-python-headless
 pandas
 openpyxl
-numpy<2.0.0
-streamlit-authenticator
+pyyaml
