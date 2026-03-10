@@ -51,7 +51,7 @@ if st.session_state.get("authentication_status"):
     elif sayfa == "📂 Eski Projelerim":
         st.title("📂 Kayıtlı Projeler")
         st.info("Burası henüz yapım aşamasında.")  
-     try:
+    try:
         API_KEY = st.secrets["ROBOFLOW_API_KEY"]
 
         WORKSPACE = "bars-workspace-tcviv"
@@ -125,6 +125,7 @@ elif st.session_state.get("authentication_status") is False:
 else:
 
     st.info('Lütfen kullanıcı adı ve şifrenizi giriniz')
+
 
 
 
