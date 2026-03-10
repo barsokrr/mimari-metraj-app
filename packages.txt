@@ -1,1 +1,1 @@
-libmesa-dev
+libgl1
