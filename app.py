@@ -10,8 +10,8 @@ import copy
 # 1. SAYFA AYARLARI (Mutlaka EN ÜSTTE olmalı)
 st.set_page_config(page_title="Mimari Metraj Otomasyonu", layout="wide")
 
-# 2. GİRİŞ SİSTEMİ AYARLARI
-# 'TypeError: Secrets does not support item assignment' hatasını bu satır çözer:
+# 2. GİRİŞ SİSTEMİ (Hata almamak için kopyalama yapıyoruz)
+# Bu satır image_6bf322.png ve image_6bf7be.png hatalarını çözer:
 credentials = copy.deepcopy(st.secrets['credentials'])
 
 authenticator = stauth.Authenticate(
@@ -21,12 +21,11 @@ authenticator = stauth.Authenticate(
     st.secrets['cookie']['expiry_days']
 )
 
-# Giriş formunu ekrana getir
 name, authentication_status, username = authenticator.login('Giriş Yap', 'main')
 
-# 3. UYGULAMA MANTIĞI (Sadece giriş yapıldıysa çalışır)
+# 3. UYGULAMA MANTIĞI
 if authentication_status:
-    # Kredi Sistemi (Oturum bazlı başlangıç)
+    # Kredi Sistemi (Şimdilik oturum bazlı)
     if 'user_credits' not in st.session_state:
         st.session_state.user_credits = 10 
 
@@ -35,8 +34,7 @@ if authentication_status:
     st.sidebar.metric("Kalan Analiz Krediniz", st.session_state.user_credits)
 
     st.title("🏗️ Mimari Plan Duvar Metraj Uygulaması")
-    st.write("Planınızı yükleyin, duvarları otomatik tespit edelim.")
-
+    
     # Roboflow Ayarları
     API_KEY = st.secrets["ROBOFLOW_API_KEY"]
     WORKSPACE = "bars-workspace-tcviv"
@@ -45,7 +43,6 @@ if authentication_status:
     
     client = InferenceHTTPClient(api_url="https://serverless.roboflow.com", api_key=API_KEY)
 
-    # Dosya Yükleme Alanı
     uploaded_file = st.file_uploader("Mimari Planı Seçin...", type=["jpg", "jpeg", "png"])
 
     if uploaded_file is not None:
@@ -54,11 +51,11 @@ if authentication_status:
         
         col1, col2 = st.columns(2)
         with col1:
-            st.image(image, caption="Yüklenen Plan", use_column_width=True)
+            st.image(image, caption="Yüklenen Plan", use_container_width=True)
 
         if st.button("Metrajı Hesapla ve Analiz Et"):
             if st.session_state.user_credits > 0:
-                with st.spinner('AI Modeli analiz ediyor, lütfen bekleyin...'):
+                with st.spinner('Analiz ediliyor...'):
                     cv2.imwrite("temp.jpg", image)
                     result = client.run_workflow(
                         workspace_name=WORKSPACE,
@@ -84,25 +81,18 @@ if authentication_status:
                         cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 3)
 
                     with col2:
-                        st.image(image, caption="Tespit Edilen Alanlar", use_column_width=True)
+                        st.image(image, caption="Tespit Edilen Alanlar", use_container_width=True)
 
-                    # Tablo ve Excel Çıktısı
                     df = pd.DataFrame(metraj_listesi)
-                    st.write("### 📊 Metraj Sonuçları")
                     st.dataframe(df)
-
-                    towrite = io.BytesIO()
-                    df.to_excel(towrite, index=False, engine='openpyxl')
-                    towrite.seek(0)
-                    st.download_button(label="📥 Excel Listesini İndir", data=towrite, file_name="metraj.xlsx")
 
                     # KREDİ DÜŞÜRME
                     st.session_state.user_credits -= 1
                     st.success(f"Analiz tamamlandı! Kalan krediniz: {st.session_state.user_credits}")
             else:
-                st.error("🚫 Krediniz bitti! Lütfen yeni kredi yükleyin.")
+                st.error("Krediniz bitti! Lütfen yeni paket satın alın.")
 
 elif authentication_status == False:
-    st.error('❌ Kullanıcı adı veya şifre hatalı')
+    st.error('Kullanıcı adı veya şifre hatalı')
 elif authentication_status == None:
-    st.warning('👋 Lütfen kullanıcı adı ve şifrenizi girerek uygulamayı başlatın.')
+    st.warning('Lütfen kullanıcı adı ve şifrenizi girerek uygulamayı başlatın.')
