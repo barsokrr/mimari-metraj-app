@@ -1,8 +1,8 @@
 streamlit
+streamlit-authenticator
+PyYAML
 opencv-python-headless==4.8.0.74
 inference-sdk
 numpy<2.0.0
 pandas
 openpyxl
-streamlit-authenticator
-PyYAML
