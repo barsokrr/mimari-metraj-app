@@ -39,18 +39,7 @@ if st.session_state.get("authentication_status"):
         st.divider()
         # Çıkış butonunu buraya aldık
         authenticator.logout('Çıkış Yap', 'sidebar')
-    # 42. satırdan itibaren (Hizalama 1 TAB içeride olmalı)
-    if sayfa == "🏠 Ana Sayfa":
-        st.title("🏗️ Akıllı Duvar Ölçüm Sistemi")
-        # Buraya senin mevcut Roboflow analiz kodlarını (file_uploader vb.) yapıştır
         
-    elif sayfa == "📂 Eski Projelerim":
-        st.title("📂 Kayıtlı Projeler")
-        st.info("Projeleriniz yakında burada depolanacak.")
-        
-    elif sayfa == "⚙️ Ayarlar":
-        st.title("⚙️ Ayarlar")
-        st.write("Profil ayarlarınızı buradan güncelleyebilirsiniz.")    # 2. SEÇİLEN SAYFAYA GÖRE İÇERİĞİ GÖSTER
     if sayfa == "🏠 Ana Sayfa":
         st.title("🏗️ Akıllı Duvar Ölçüm Sistemi")
         st.write(f"Hoş geldin *{st.session_state.get('name', 'Kullanıcı')}*")
@@ -144,5 +133,6 @@ elif st.session_state.get("authentication_status") is False:
 else:
 
     st.info('Lütfen kullanıcı adı ve şifrenizi giriniz')
+
 
 
