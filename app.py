@@ -29,12 +29,13 @@ if st.session_state.get("authentication_status"):
     st.title("🏗️ Mimari Plan Duvar Metraj Uygulaması")
     st.write(f"Hoş geldin *{st.session_state.get('name', 'Kullanıcı')}*")
     
-    # API Anahtarını alırken hata almamak için güvenli yöntem
-    try:
-        API_KEY = st.secrets["my238ZSyFyxbwEVQHISP"]
-    except KeyError:
-        st.error("Hata: Secrets ayarlarında 'ROBOFLOW_API_KEY' bulunamadı.")
-        st.stop()
+   # API Anahtarını alırken hata almamak için DOĞRU yöntem
+try:
+    # Buraya anahtarı değil, Secrets panelindeki ADINI yazmalısın
+    API_KEY = st.secrets["ROBOFLOW_API_KEY"]
+except KeyError:
+    st.error("Hata: Secrets ayarlarında 'ROBOFLOW_API_KEY' bulunamadı.")
+    st.stop()
 
     WORKSPACE = "bars-workspace-tcviv"
     WORKFLOW = "custom-workflow-2"
@@ -94,6 +95,7 @@ elif st.session_state.get("authentication_status") is False:
     st.error('Kullanıcı adı veya şifre hatalı')
 else:
     st.info('Lütfen kullanıcı adı ve şifrenizi giriniz')
+
 
 
 
