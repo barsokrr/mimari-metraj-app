@@ -27,7 +27,7 @@ if st.session_state.get("authentication_status"):
 
     authenticator.logout('Çıkış Yap', 'sidebar')
 
-    st.title("🏗️ Akıllı Duvar Ölçüm Sistemi)
+    st.title("🏗️ Akıllı Duvar Ölçüm Sistemi")
     st.write(f"Hoş geldin *{st.session_state.get('name', 'Kullanıcı')}*")
 
     try:
@@ -104,4 +104,5 @@ elif st.session_state.get("authentication_status") is False:
 else:
 
     st.info('Lütfen kullanıcı adı ve şifrenizi giriniz')
+
 
