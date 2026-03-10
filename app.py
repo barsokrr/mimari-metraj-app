@@ -24,7 +24,47 @@ authenticator.login(location='main')
 
 # --- KİMLİK DOĞRULAMA KONTROLÜ ---
 if st.session_state.get("authentication_status"):
+# 1. YAN MENÜ (SIDEBAR) AYARLARI
+    with st.sidebar:
+        st.markdown(f"### 👤 Profil")
+        st.write(f"**Kullanıcı:** {st.session_state.get('name', 'Kullanıcı')}")
+        st.divider() # İnce çizgi
+        
+        # Sayfa Seçim Menüsü
+        sayfa = st.radio(
+            "Uygulama Menüsü",
+            ["🏠 Ana Sayfa", "📂 Eski Projelerim", "⚙️ Ayarlar"]
+        )
+        
+        st.divider()
+        # Çıkış butonunu buraya aldık
+        authenticator.logout('Çıkış Yap', 'sidebar')
+    # 42. satırdan itibaren (Hizalama 1 TAB içeride olmalı)
+    if sayfa == "🏠 Ana Sayfa":
+        st.title("🏗️ Akıllı Duvar Ölçüm Sistemi")
+        # Buraya senin mevcut Roboflow analiz kodlarını (file_uploader vb.) yapıştır
+        
+    elif sayfa == "📂 Eski Projelerim":
+        st.title("📂 Kayıtlı Projeler")
+        st.info("Projeleriniz yakında burada depolanacak.")
+        
+    elif sayfa == "⚙️ Ayarlar":
+        st.title("⚙️ Ayarlar")
+        st.write("Profil ayarlarınızı buradan güncelleyebilirsiniz.")    # 2. SEÇİLEN SAYFAYA GÖRE İÇERİĞİ GÖSTER
+    if sayfa == "🏠 Ana Sayfa":
+        st.title("🏗️ Akıllı Duvar Ölçüm Sistemi")
+        st.write(f"Hoş geldin *{st.session_state.get('name', 'Kullanıcı')}*")
+        
+        # Mevcut analiz ve dosya yükleme kodların buraya gelecek (try-except bloğu vb.)
+        # ...
+        
+    elif sayfa == "📂 Eski Projelerim":
+        st.title("📂 Kayıtlı Projeler")
+        st.info("Kayıtlı projeleriniz yakında burada listelenecek.")
 
+    elif sayfa == "⚙️ Ayarlar":
+        st.title("⚙️ Ayarlar")
+        st.write("Uygulama tercihlerini buradan yönetebilirsiniz.")
     authenticator.logout('Çıkış Yap', 'sidebar')
 
     st.title("🏗️ Akıllı Duvar Ölçüm Sistemi")
