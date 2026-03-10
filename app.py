@@ -26,33 +26,41 @@ authenticator = stauth.Authenticate(
 # --- GİRİŞ PANELİ ---
 # Kütüphanenin yeni versiyonuna göre bu şekilde çağırıyoruz
 st.title("🏗️ Mimari Plan Duvar Metraj Uygulaması")
-st.write(f"Hoş geldin *{st.session_state.get('name', 'Kullanıcı')}*")
+st.write(f"Hoş geldin *{st.session_state.get('name', 'Admin')}*")
+st.write("Planınızı yükleyin, duvarları otomatik tespit edelim.")
 
-# Güvenli API okuma
+# API Anahtarını sadece giriş başarılıysa oku (Hata almamak için)
 API_KEY = st.secrets.get("ROBOFLOW_API_KEY")
 WORKSPACE = "bars-workspace-tcviv"
 WORKFLOW = "custom-workflow-2"
 PIXEL_TO_METER_RATIO = 0.02 
 
-if not API_KEY:
-    st.error("Secrets kısmında ROBOFLOW_API_KEY bulunamadı!")
-else:
+if API_KEY:
     client = InferenceHTTPClient(api_url="[https://serverless.roboflow.com](https://serverless.roboflow.com)", api_key=API_KEY)
     uploaded_file = st.file_uploader("Mimari Planı Seçin...", type=["jpg", "jpeg", "png"])
 
     if uploaded_file is not None:
         file_bytes = np.asarray(bytearray(uploaded_file.read()), dtype=np.uint8)
         image = cv2.imdecode(file_bytes, 1)
-        st.image(image, caption="Yüklenen Plan", use_container_width=True)
+
+        col1, col2 = st.columns(2)
+        with col1:
+            st.image(image, caption="Yüklenen Plan", use_container_width=True)
 
         if st.button("Metrajı Hesapla"):
             with st.spinner('Analiz ediliyor...'):
                 cv2.imwrite("temp.jpg", image)
                 result = client.run_workflow(workspace_name=WORKSPACE, workflow_id=WORKFLOW, images={"image": "temp.jpg"})
+                
                 predictions = result[0]['predictions']['predictions']
                 metraj_listesi = []
+
                 for i, wall in enumerate(predictions):
                     x, y, w, h = wall['x'], wall['y'], wall['width'], wall['height']
                     m_w, m_h = round(w * PIXEL_TO_METER_RATIO, 2), round(h * PIXEL_TO_METER_RATIO, 2)
                     metraj_listesi.append({"Duvar": f"D-{i+1}", "Genişlik": m_w, "Yükseklik": m_h, "Alan": round(m_w*m_h, 2)})
+                
+                st.write("### Metraj Sonuçları")
                 st.dataframe(pd.DataFrame(metraj_listesi))
+else:
+    st.error("Hata: ROBOFLOW_API_KEY Secrets içinde bulunamadı!")
