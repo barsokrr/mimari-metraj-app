@@ -1,7 +1,6 @@
 streamlit
-streamlit-authenticator==0.3.2
 opencv-python-headless
 inference-sdk
-numpy<2.0.0
 pandas
 openpyxl
+numpy<2.0.0
