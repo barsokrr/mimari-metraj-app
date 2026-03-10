@@ -33,9 +33,7 @@ if st.session_state.get("authentication_status"):
 try:
     # Buraya anahtarı değil, Secrets panelindeki ADINI yazmalısın
     API_KEY = st.secrets["ROBOFLOW_API_KEY"]
-except KeyError:
-    st.error("Hata: Secrets ayarlarında 'ROBOFLOW_API_KEY' bulunamadı.")
-    st.stop()
+
 
     WORKSPACE = "bars-workspace-tcviv"
     WORKFLOW = "custom-workflow-2"
@@ -103,6 +101,7 @@ elif st.session_state.get("authentication_status") is False:
     
 else:
     st.info('Lütfen kullanıcı adı ve şifrenizi giriniz')
+
 
 
 
