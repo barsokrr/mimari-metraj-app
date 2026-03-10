@@ -36,7 +36,7 @@ PIXEL_TO_METER_RATIO = 0.02
 
 client = InferenceHTTPClient(api_url="[https://serverless.roboflow.com](https://serverless.roboflow.com)", api_key=API_KEY)
 
-uploaded_file = st.file_uploader("Mimari Planı Seçin (JPG, PNG)...", type=["jpg", "jpeg", "png"])
+uploaded_file = st.file_uploader("Mimari Planı Seçin...", type=["jpg", "jpeg", "png"])
 
 if uploaded_file is not None:
     file_bytes = np.asarray(bytearray(uploaded_file.read()), dtype=np.uint8)
