@@ -7,11 +7,11 @@ from inference_sdk import InferenceHTTPClient
 import io
 import copy
 
-# 1. SAYFA AYARLARI (Mutlaka EN ÜSTTE olmalı)
+# 1. AYARLAR (Mutlaka en üstte ve boşluksuz)
 st.set_page_config(page_title="Mimari Metraj Otomasyonu", layout="wide")
 
-# 2. GİRİŞ SİSTEMİ (Hata almamak için kopyalama yapıyoruz)
-# Bu satır image_6bf322.png ve image_6bf7be.png hatalarını çözer:
+# 2. GÜVENLİ GİRİŞ SİSTEMİ
+# TypeError hatasını engellemek için copy kullanıyoruz
 credentials = copy.deepcopy(st.secrets['credentials'])
 
 authenticator = stauth.Authenticate(
@@ -23,19 +23,20 @@ authenticator = stauth.Authenticate(
 
 name, authentication_status, username = authenticator.login('Giriş Yap', 'main')
 
-# 3. UYGULAMA MANTIĞI
+# 3. ANALİZ SİSTEMİ (Orijinal Kodun)
 if authentication_status:
-    # Kredi Sistemi (Şimdilik oturum bazlı)
+    # Kredi Tanımlama
     if 'user_credits' not in st.session_state:
         st.session_state.user_credits = 10 
 
     authenticator.logout('Çıkış Yap', 'sidebar')
     st.sidebar.title(f"Hoş geldin, {name}")
-    st.sidebar.metric("Kalan Analiz Krediniz", st.session_state.user_credits)
+    st.sidebar.metric("Kalan Krediniz", st.session_state.user_credits)
 
     st.title("🏗️ Mimari Plan Duvar Metraj Uygulaması")
-    
-    # Roboflow Ayarları
+    st.write("Planınızı yükleyin, duvarları otomatik tespit edelim.")
+
+    # Orijinal Roboflow Ayarların
     API_KEY = st.secrets["ROBOFLOW_API_KEY"]
     WORKSPACE = "bars-workspace-tcviv"
     WORKFLOW = "custom-workflow-2"
@@ -56,6 +57,7 @@ if authentication_status:
         if st.button("Metrajı Hesapla ve Analiz Et"):
             if st.session_state.user_credits > 0:
                 with st.spinner('Analiz ediliyor...'):
+                    # Orijinal Analiz Kodun
                     cv2.imwrite("temp.jpg", image)
                     result = client.run_workflow(
                         workspace_name=WORKSPACE,
@@ -84,15 +86,20 @@ if authentication_status:
                         st.image(image, caption="Tespit Edilen Alanlar", use_container_width=True)
 
                     df = pd.DataFrame(metraj_listesi)
+                    st.write("### 📊 Metraj Sonuçları")
                     st.dataframe(df)
 
-                    # KREDİ DÜŞÜRME
+                    towrite = io.BytesIO()
+                    df.to_excel(towrite, index=False, engine='openpyxl')
+                    towrite.seek(0)
+                    st.download_button(label="📥 Excel Listesini İndir", data=towrite, file_name="metraj.xlsx")
+
                     st.session_state.user_credits -= 1
                     st.success(f"Analiz tamamlandı! Kalan krediniz: {st.session_state.user_credits}")
             else:
-                st.error("Krediniz bitti! Lütfen yeni paket satın alın.")
+                st.error("Krediniz bitti!")
 
 elif authentication_status == False:
-    st.error('Kullanıcı adı veya şifre hatalı')
+    st.error('Hatalı giriş')
 elif authentication_status == None:
-    st.warning('Lütfen kullanıcı adı ve şifrenizi girerek uygulamayı başlatın.')
+    st.warning('Lütfen giriş yapın')
