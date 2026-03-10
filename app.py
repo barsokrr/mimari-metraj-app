@@ -37,45 +37,74 @@ try:
 
     WORKSPACE = "bars-workspace-tcviv"
     WORKFLOW = "custom-workflow-2"
-# --- 1. API ANAHTARI KONTROLÜ (BAĞIMSIZ BLOK) ---
-try:
-    API_KEY = st.secrets["ROBOFLOW_API_KEY"]
-except Exception:
-    st.error("Hata: Secrets ayarlarında 'ROBOFLOW_API_KEY' bulunamadı.")
-    st.stop()
+    PIXEL_TO_METER_RATIO = 0.02 
 
-# --- 2. GİRİŞ SİSTEMİ ---
-# authenticator nesnesini daha önce yukarıda tanımladığını varsayıyorum
-name, authentication_status, username = authenticator.login('Giriş Yap', 'main')
+    # Dosya yükleyici
+    uploaded_file = st.file_uploader("Mimari Planı Seçin (JPG, PNG)...", type=["jpg", "jpeg", "png"])
 
-if st.session_state.get("authentication_status"):
-    # GİRİŞ BAŞARILIYSA BURASI ÇALIŞIR
-    authenticator.logout('Çıkış Yap', 'sidebar')
-    st.sidebar.write(f'Hoş geldin *{st.session_state["name"]}*')
-    
-    st.title("Mimari Plan Duvar Metraj Uygulaması")
-    
-    # --- ANALİZ MANTIĞI ---
-    uploaded_file = st.file_uploader("Mimari Planı Seçin (JPG, PNG)...", type=["jpg", "png", "jpeg"])
-    
     if uploaded_file is not None:
+        # Görüntüyü oku
         file_bytes = np.asarray(bytearray(uploaded_file.read()), dtype=np.uint8)
         image = cv2.imdecode(file_bytes, 1)
+        
         st.image(image, caption="Yüklenen Plan", use_container_width=True)
 
-        if st.button("Metrajı Hesapla"):
-            with st.spinner('Analiz ediliyor...'):
-                client = InferenceHTTPClient(api_url="https://serverless.roboflow.com", api_key=API_KEY)
-                result = client.run_workflow(
-                    workspace_name="bars-workspace-tcviv",
-                    workflow_id="custom-workflow-2",
-                    images={"image": image}
-                )
-                st.write("Sonuçlar:")
-                st.json(result)
+        if st.button("Metrajı Hesapla ve Analiz Et"):
+            with st.spinner('Model analiz ediyor, lütfen bekleyin...'):
+                try:
+                    client = InferenceHTTPClient(api_url="https://serverless.roboflow.com", api_key=API_KEY)
+                    
+                    # Geçici dosya oluşturmadan doğrudan byte üzerinden gönderim
+                    _, buffer = cv2.imencode(".jpg", image)
+                    img_bytes = buffer.tobytes()
+                    
+                    result = client.run_workflow(
+                        workspace_name=WORKSPACE,
+                        workflow_id=WORKFLOW,
+                        images={"image": image} # SDK bazen doğrudan numpy dizisini kabul eder
+                    )
 
+                    predictions = result[0]['predictions']['predictions']
+                    metraj_listesi = []
+
+                    for i, wall in enumerate(predictions):
+                        w, h = wall['width'], wall['height']
+                        m_w = round(w * PIXEL_TO_METER_RATIO, 2)
+                        m_h = round(h * PIXEL_TO_METER_RATIO, 2)
+
+                        metraj_listesi.append({
+                            "Duvar_ID": f"Duvar-{i+1}",
+                            "Genişlik (m)": m_w,
+                            "Yükseklik (m)": m_h,
+                            "Alan (m2)": round(m_w * m_h, 2)
+                        })
+
+                    if metraj_listesi:
+                        df = pd.DataFrame(metraj_listesi)
+                        st.write("### Metraj Sonuçları")
+                        st.dataframe(df)
+                    else:
+                        st.warning("Hiç duvar tespit edilemedi.")
+                        
+                except Exception as e:
+                    st.error(f"Analiz sırasında bir hata oluştu: {e}")
+# --- KİMLİK DOĞRULAMA KONTROLÜ ---
+if st.session_state.get("authentication_status"):
+    # Giriş başarılıysa logout butonu ve ana uygulama içeriği buraya gelir
+    authenticator.logout('Çıkış Yap', 'sidebar')
+    st.write(f'Hoş geldin *{st.session_state["name"]}*')
+    
+    # Buradan sonra senin metraj hesaplama kodların (st.file_uploader vb.) devam etmeli
+    
 elif st.session_state.get("authentication_status") is False:
     st.error('Kullanıcı adı veya şifre hatalı')
-
+    
 else:
     st.info('Lütfen kullanıcı adı ve şifrenizi giriniz')
+
+
+
+
+
+
+
