@@ -41,7 +41,12 @@ if st.session_state.get("authentication_status"):
     if sayfa == "🏠 Ana Sayfa":
         # Başlık sadece buranın içinde olsun!
         st.title("🏗️ Akıllı Duvar Ölçüm Sistemi")
-        
+        # --- MALİYET AYARLARI (Sidebar) ---
+        st.sidebar.header("💰 Maliyet Ayarları")
+        cizim_birimi = st.sidebar.selectbox("Çizim Birimi", ["Metre", "Santimetre", "Milimetre"])
+        kat_yuksekligi = st.sidebar.number_input("Kat Yüksekliği (m)", min_value=1.0, value=3.0)
+        duvar_kalinligi = st.sidebar.number_input("Duvar Kalınlığı (m)", min_value=0.01, value=0.20)
+        birim_fiyat = st.sidebar.number_input("Birim Fiyat (TL/m³)", min_value=0, value=2500)
         # 46. Satır: Dosya türlerine dxf ekledik
     uploaded_file = st.file_uploader("Plan Seçin (Resim veya .dxf)", type=["jpg", "png", "dxf"])
     
@@ -72,10 +77,26 @@ if st.session_state.get("authentication_status"):
                     else:
                         diger_uzunluk += uzunluk
                 
-                # Sonuçları yan yana sütunlarda göster
-                c1, c2 = st.columns(2)
-                c1.metric("🧱 Duvar Metrajı", f"{duvar_uzunlugu:.2f}")
-                c2.metric("📐 Diğer Çizgiler", f"{diger_uzunluk:.2f}")
+                # --- HESAPLAMA VE BİRİM DÖNÜŞÜMÜ ---
+                if cizim_birimi == "Santimetre":
+                    duvar_uzunlugu_m = duvar_uzunlugu / 100
+                elif cizim_birimi == "Milimetre":
+                    duvar_uzunlugu_m = duvar_uzunlugu / 1000
+                else:
+                    duvar_uzunlugu_m = duvar_uzunlugu
+
+                # Hacim ve Maliyet Hesabı
+                toplam_hacim = duvar_uzunlugu_m * kat_yuksekligi * duvar_kalinligi
+                toplam_maliyet = toplam_hacim * birim_fiyat
+
+                # --- SONUÇLARI GÖSTER ---
+                st.divider()
+                st.subheader("💰 Maliyet ve Metraj Özeti")
+                col1, col2, col3 = st.columns(3)
+                
+                col1.metric("🧱 Toplam Uzunluk", f"{duvar_uzunlugu_m:.2f} m")
+                col2.metric("📦 Toplam Hacim", f"{toplam_hacim:.2f} m³")
+                col3.metric("💸 Yaklaşık Maliyet", f"{toplam_maliyet:,.2f} TL".replace(",", "X").replace(".", ",").replace("X", "."))
                 
             except Exception as e:
                 st.error(f"DXF dosyası okunurken hata oluştu: {e}")
@@ -156,6 +177,7 @@ elif st.session_state.get("authentication_status") is False:
 else:
 
     st.info('Lütfen kullanıcı adı ve şifrenizi giriniz')
+
 
 
 
