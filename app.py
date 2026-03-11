@@ -80,11 +80,6 @@ if st.session_state.get("authentication_status"):
         WORKFLOW = "custom-workflow-2"
         PIXEL_TO_METER_RATIO = 0.02
 
-        uploaded_file = st.file_uploader(
-            "Mimari Planı Seçin (JPG, PNG)...",
-            type=["jpg", "jpeg", "png"]
-        )
-
         if uploaded_file is not None:
 
             file_bytes = np.asarray(bytearray(uploaded_file.read()), dtype=np.uint8)
@@ -147,6 +142,7 @@ elif st.session_state.get("authentication_status") is False:
 else:
 
     st.info('Lütfen kullanıcı adı ve şifrenizi giriniz')
+
 
 
 
