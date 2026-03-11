@@ -53,18 +53,32 @@ if st.session_state.get("authentication_status"):
             st.subheader("📏 AutoCAD (DXF) Analizi")
             try:
                 import ezdxf
-                # DXF okuma işlemleri
                 doc = ezdxf.read_stream(uploaded_file)
                 msp = doc.modelspace()
                 
-                # Örnek: Tüm çizgileri (LINE) bul ve uzunluklarını topla
-                lines = msp.query('LINE')
-                total_len = sum(((l.dxf.end[0]-l.dxf.start[0])**2 + (l.dxf.end[1]-l.dxf.start[1])**2)**0.5 for l in lines)
+                duvar_uzunlugu = 0
+                diger_uzunluk = 0
                 
-                st.success(f"Analiz Başarılı! Toplam Çizgi Uzunluğu: {total_len:.2f} birim")
+                # Tüm çizgileri (LINE) dönerek kontrol et
+                for line in msp.query('LINE'):
+                    start = line.dxf.start
+                    end = line.dxf.end
+                    uzunluk = ((end[0]-start[0])**2 + (end[1]-start[1])**2)**0.5
+                    
+                    # Katman ismine bak (DUVAR veya WALL içeriyor mu?)
+                    layer_name = line.dxf.layer.upper()
+                    if "DUVAR" in layer_name or "WALL" in layer_name:
+                        duvar_uzunlugu += uzunluk
+                    else:
+                        diger_uzunluk += uzunluk
+                
+                # Sonuçları yan yana sütunlarda göster
+                c1, c2 = st.columns(2)
+                c1.metric("🧱 Duvar Metrajı", f"{duvar_uzunlugu:.2f}")
+                c2.metric("📐 Diğer Çizgiler", f"{diger_uzunluk:.2f}")
+                
             except Exception as e:
                 st.error(f"DXF dosyası okunurken hata oluştu: {e}")
-
         else:
             # BURASI SENİN MEVCUT ROBOFLOW ANALİZ KODLARIN (Resimler için)
             st.subheader("🖼️ Yapay Zeka (Görsel) Analizi")
@@ -142,6 +156,7 @@ elif st.session_state.get("authentication_status") is False:
 else:
 
     st.info('Lütfen kullanıcı adı ve şifrenizi giriniz')
+
 
 
 
