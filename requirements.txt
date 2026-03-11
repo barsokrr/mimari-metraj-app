@@ -4,3 +4,5 @@ inference-sdk
 opencv-python-headless
 pandas
 pyyaml
+roboflow
+ezdxf
