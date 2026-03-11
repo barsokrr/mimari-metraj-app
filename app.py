@@ -42,12 +42,34 @@ if st.session_state.get("authentication_status"):
         # Başlık sadece buranın içinde olsun!
         st.title("🏗️ Akıllı Duvar Ölçüm Sistemi")
         
-        # Ölçüm aracın (file_uploader vb.) BURADA olmalı
-        uploaded_file = st.file_uploader("Plan Seçin", type=["jpg", "png"])
-        if uploaded_file:
-            # Analiz kodların...
-            st.success("Dosya yüklendi, analize hazır.")
+        # 46. Satır: Dosya türlerine dxf ekledik
+    uploaded_file = st.file_uploader("Plan Seçin (Resim veya .dxf)", type=["jpg", "png", "dxf"])
+    
+    if uploaded_file:
+        # Dosya uzantısını kontrol et
+        file_extension = uploaded_file.name.split('.')[-1].lower()
 
+        if file_extension == 'dxf':
+            st.subheader("📏 AutoCAD (DXF) Analizi")
+            try:
+                import ezdxf
+                # DXF okuma işlemleri
+                doc = ezdxf.read_stream(uploaded_file)
+                msp = doc.modelspace()
+                
+                # Örnek: Tüm çizgileri (LINE) bul ve uzunluklarını topla
+                lines = msp.query('LINE')
+                total_len = sum(((l.dxf.end[0]-l.dxf.start[0])**2 + (l.dxf.end[1]-l.dxf.start[1])**2)**0.5 for l in lines)
+                
+                st.success(f"Analiz Başarılı! Toplam Çizgi Uzunluğu: {total_len:.2f} birim")
+            except Exception as e:
+                st.error(f"DXF dosyası okunurken hata oluştu: {e}")
+
+        else:
+            # BURASI SENİN MEVCUT ROBOFLOW ANALİZ KODLARIN (Resimler için)
+            st.subheader("🖼️ Yapay Zeka (Görsel) Analizi")
+            st.success("Dosya yüklendi, Roboflow analizi başlatılıyor...")
+            # Mevcut analiz fonksiyonlarını buraya çağır
     elif sayfa == "📂 Eski Projelerim":
         st.title("📂 Kayıtlı Projeler")
         st.info("Burası henüz yapım aşamasında.")  
@@ -125,6 +147,7 @@ elif st.session_state.get("authentication_status") is False:
 else:
 
     st.info('Lütfen kullanıcı adı ve şifrenizi giriniz')
+
 
 
 
