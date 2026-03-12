@@ -3,7 +3,6 @@ import streamlit_authenticator as stauth
 import yaml
 from yaml.loader import SafeLoader
 import numpy as np
-import cv2
 import pandas as pd
 import tempfile
 import math
@@ -11,8 +10,7 @@ import matplotlib.pyplot as plt
 import ezdxf
 
 
-
-# ---------------- GEOMETRY UTILITIES ----------------
+# ---------------- GEOMETRY ----------------
 
 def line_length(l):
     x1,y1,x2,y2 = l
@@ -24,15 +22,23 @@ def line_vector(l):
     return np.array([x2-x1,y2-y1])
 
 
+def line_angle(l):
+
+    x1,y1,x2,y2=l
+    angle=abs(math.degrees(math.atan2(y2-y1,x2-x1)))
+
+    return angle
+
+
 def line_distance(l1,l2):
 
-    x1,y1,x2,y2 = l1
-    x3,y3,x4,y4 = l2
+    x1,y1,x2,y2=l1
+    x3,y3,x4,y4=l2
 
-    num = abs((x3-x1)*(y2-y1)-(y3-y1)*(x2-x1))
-    den = math.dist((x1,y1),(x2,y2))
+    num=abs((x3-x1)*(y2-y1)-(y3-y1)*(x2-x1))
+    den=math.dist((x1,y1),(x2,y2))
 
-    if den == 0:
+    if den==0:
         return 999
 
     return num/den
@@ -40,13 +46,13 @@ def line_distance(l1,l2):
 
 def parallel(l1,l2):
 
-    v1 = line_vector(l1)
-    v2 = line_vector(l2)
+    v1=line_vector(l1)
+    v2=line_vector(l2)
 
     if np.linalg.norm(v1)==0 or np.linalg.norm(v2)==0:
         return False
 
-    cos = np.dot(v1,v2)/(np.linalg.norm(v1)*np.linalg.norm(v2))
+    cos=np.dot(v1,v2)/(np.linalg.norm(v1)*np.linalg.norm(v2))
 
     return abs(cos)>0.97
 
@@ -55,16 +61,8 @@ def parallel(l1,l2):
 
 def extract_lines_from_dxf(path):
 
-    doc = ezdxf.readfile(path)
-    msp = doc.modelspace()
-
-    unit = doc.units
-    scale = 1
-
-    if unit == 4:
-        scale = 0.001
-    elif unit == 5:
-        scale = 0.01
+    doc=ezdxf.readfile(path)
+    msp=doc.modelspace()
 
     lines=[]
 
@@ -75,10 +73,14 @@ def extract_lines_from_dxf(path):
             x1,y1,_=e.dxf.start
             x2,y2,_=e.dxf.end
 
-            l=(x1*scale,y1*scale,x2*scale,y2*scale)
+            l=(x1,y1,x2,y2)
 
-            if line_length(l)>0.3:
-                lines.append(l)
+            if line_length(l)>0.5:
+
+                angle=line_angle(l)
+
+                if angle<10 or abs(angle-90)<10:
+                    lines.append(l)
 
         if e.dxftype()=="LWPOLYLINE":
 
@@ -86,13 +88,17 @@ def extract_lines_from_dxf(path):
 
             for i in range(len(pts)-1):
 
-                x1,y1=pts[i][0]*scale,pts[i][1]*scale
-                x2,y2=pts[i+1][0]*scale,pts[i+1][1]*scale
+                x1,y1=pts[i][0],pts[i][1]
+                x2,y2=pts[i+1][0],pts[i+1][1]
 
                 l=(x1,y1,x2,y2)
 
-                if line_length(l)>0.3:
-                    lines.append(l)
+                if line_length(l)>0.5:
+
+                    angle=line_angle(l)
+
+                    if angle<10 or abs(angle-90)<10:
+                        lines.append(l)
 
     return lines
 
@@ -102,6 +108,8 @@ def extract_lines_from_dxf(path):
 def detect_wall_pairs(lines,wall_thickness):
 
     walls=[]
+
+    tolerance=wall_thickness*0.6
 
     for i in range(len(lines)):
 
@@ -115,7 +123,7 @@ def detect_wall_pairs(lines,wall_thickness):
 
             d=line_distance(l1,l2)
 
-            if abs(d-wall_thickness)<wall_thickness:
+            if abs(d-wall_thickness)<tolerance:
 
                 length=min(line_length(l1),line_length(l2))
 
@@ -124,7 +132,7 @@ def detect_wall_pairs(lines,wall_thickness):
     return walls
 
 
-# ---------------- CENTERLINE EXTRACTION ----------------
+# ---------------- CENTERLINE ----------------
 
 def centerline(l1,l2):
 
@@ -139,7 +147,7 @@ def centerline(l1,l2):
     return (cx1,cy1,cx2,cy2)
 
 
-# ---------------- WALL NETWORK ----------------
+# ---------------- CENTERLINES ----------------
 
 def build_centerlines(walls):
 
@@ -153,12 +161,53 @@ def build_centerlines(walls):
     return centers
 
 
-# ---------------- STREAMLIT CONFIG ----------------
+# ---------------- MERGE SEGMENTS ----------------
+
+def merge_centerlines(lines):
+
+    merged=[]
+
+    used=[False]*len(lines)
+
+    for i in range(len(lines)):
+
+        if used[i]:
+            continue
+
+        l1=lines[i]
+        x1,y1,x2,y2=l1
+
+        for j in range(i+1,len(lines)):
+
+            if used[j]:
+                continue
+
+            l2=lines[j]
+
+            if parallel(l1,l2):
+
+                if line_distance(l1,l2)<0.05:
+
+                    x3,y3,x4,y4=l2
+
+                    x1=min(x1,x3)
+                    y1=min(y1,y3)
+                    x2=max(x2,x4)
+                    y2=max(y2,y4)
+
+                    used[j]=True
+
+        merged.append((x1,y1,x2,y2))
+
+    return merged
+
+
+# ---------------- AUTH ----------------
 
 with open("config.yaml") as file:
-    config = yaml.load(file, Loader=SafeLoader)
+    config=yaml.load(file,Loader=SafeLoader)
 
-authenticator = stauth.Authenticate(
+authenticator=stauth.Authenticate(
     config["credentials"],
     config["cookie"]["name"],
     config["cookie"]["key"],
@@ -177,17 +226,17 @@ if st.session_state.get("authentication_status"):
         st.title("Profil")
         st.write(st.session_state.get("name"))
 
-        kat_yuksekligi = st.number_input("Kat Yüksekliği",value=3.0)
-        duvar_kalinligi = st.number_input("Duvar Kalınlığı",value=0.20)
-        birim_fiyat = st.number_input("Birim Fiyat",value=2500)
+        kat_yuksekligi=st.number_input("Kat Yüksekliği",value=3.0)
+        duvar_kalinligi=st.number_input("Duvar Kalınlığı",value=0.20)
+        birim_fiyat=st.number_input("Birim Fiyat",value=2500)
 
         authenticator.logout("Çıkış Yap","sidebar")
 
 
-    st.title("AI Mimari Metraj (Togal Mantığı)")
+    st.title("AI Mimari Metraj")
 
 
-    uploaded_file = st.file_uploader(
+    uploaded_file=st.file_uploader(
         "Plan yükle",
         type=["dxf"]
     )
@@ -207,17 +256,18 @@ if st.session_state.get("authentication_status"):
 
         centers=build_centerlines(walls)
 
+        centers=merge_centerlines(centers)
+
         duvar_uzunlugu=sum([line_length(c) for c in centers])
 
 
-        # --------- GÖRSEL ---------
+        # -------- GÖRSEL --------
 
         fig,ax=plt.subplots(figsize=(10,10))
 
         for c in centers:
 
             x1,y1,x2,y2=c
-
             ax.plot([x1,x2],[y1,y2],color="red",linewidth=2)
 
         ax.set_aspect("equal")
@@ -225,7 +275,7 @@ if st.session_state.get("authentication_status"):
         st.pyplot(fig)
 
 
-        # --------- METRAJ ---------
+        # -------- METRAJ --------
 
         alan=duvar_uzunlugu*kat_yuksekligi
         hacim=alan*duvar_kalinligi
@@ -246,4 +296,3 @@ elif st.session_state.get("authentication_status") is False:
 else:
 
     st.info("Lütfen giriş yapınız")
-
