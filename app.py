@@ -200,7 +200,7 @@ if st.session_state.get("authentication_status"):
                     "text/csv"
                 )
             
- try:
+try:
     st.info(f"Tespit edilen duvar sayısı: {duvar_sayisi}")
 except Exception as e:
     st.error(f"DXF dosyası okunurken hata oluştu: {e}")
@@ -277,6 +277,7 @@ try:
             else:
             
             st.info('Lütfen kullanıcı adı ve şifrenizi giriniz')
+
 
 
 
