@@ -6,3 +6,4 @@ roboflow
 inference-sdk
 pyyaml
 streamlit-authenticator
+matplotlib
