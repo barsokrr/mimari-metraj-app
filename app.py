@@ -8,6 +8,7 @@ import pandas as pd
 from inference_sdk import InferenceHTTPClient
 import tempfile
 import math
+import matplotlib.pyplot as plt
 
 # --- CONFIG ---
 with open('config.yaml') as file:
@@ -75,6 +76,9 @@ if st.session_state.get("authentication_status"):
 
                     wall_keywords = ["wall","duvar","a-wall","mim-wall"]
 
+                    # ---------- DUVARLARI GÖRSELLEŞTİR ----------
+                    fig, ax = plt.subplots(figsize=(10,10))
+
                     for entity in msp:
 
                         if entity.dxftype() == "LINE":
@@ -85,13 +89,32 @@ if st.session_state.get("authentication_status"):
                             x1,y1 = start.x,start.y
                             x2,y2 = end.x,end.y
 
+                            x = [x1,x2]
+                            y = [y1,y2]
+
                             uzunluk = math.sqrt((x2-x1)**2 + (y2-y1)**2)
 
                             layer = entity.dxf.layer.lower()
 
                             if any(k in layer for k in wall_keywords):
+
                                 duvar_uzunlugu += uzunluk
                                 duvar_sayisi += 1
+
+                                # DUVARLARI KIRMIZI ÇİZ
+                                ax.plot(x,y,color="red",linewidth=2)
+
+                            else:
+
+                                # DİĞER ÇİZGİLERİ GRİ ÇİZ
+                                ax.plot(x,y,color="gray",linewidth=0.5,alpha=0.3)
+
+                    ax.set_aspect('equal')
+                    ax.set_title("Kırmızı Çizgiler = Programın Duvar Kabul Ettikleri")
+
+                    st.pyplot(fig)
+
+                    # ---------- METRAJ HESAPLAMA ----------
 
                     duvar_alani = duvar_uzunlugu * kat_yuksekligi
                     duvar_hacmi = duvar_alani * duvar_kalinligi
