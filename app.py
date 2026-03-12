@@ -3,7 +3,6 @@ import streamlit_authenticator as stauth
 import yaml
 from yaml.loader import SafeLoader
 import numpy as np
-import pandas as pd
 import tempfile
 import math
 import matplotlib.pyplot as plt
@@ -15,17 +14,17 @@ import ezdxf
 # ------------------------------------------------
 
 def line_length(l):
-    x1,y1,x2,y2 = l
+    x1,y1,x2,y2=l
     return math.dist((x1,y1),(x2,y2))
 
 
 def line_angle(l):
-    x1,y1,x2,y2 = l
+    x1,y1,x2,y2=l
     return abs(math.degrees(math.atan2(y2-y1,x2-x1)))
 
 
 def line_vector(l):
-    x1,y1,x2,y2 = l
+    x1,y1,x2,y2=l
     return np.array([x2-x1,y2-y1])
 
 
@@ -39,7 +38,7 @@ def parallel(l1,l2):
 
     cos=np.dot(v1,v2)/(np.linalg.norm(v1)*np.linalg.norm(v2))
 
-    return abs(cos)>0.98
+    return abs(cos)>0.99
 
 
 def line_distance(l1,l2):
@@ -62,8 +61,8 @@ def line_distance(l1,l2):
 
 def extract_lines_from_dxf(path):
 
-    doc = ezdxf.readfile(path)
-    msp = doc.modelspace()
+    doc=ezdxf.readfile(path)
+    msp=doc.modelspace()
 
     lines=[]
 
@@ -71,17 +70,13 @@ def extract_lines_from_dxf(path):
 
         if e.dxftype()=="LINE":
 
-            x1,y1,_ = e.dxf.start
-            x2,y2,_ = e.dxf.end
+            x1,y1,_=e.dxf.start
+            x2,y2,_=e.dxf.end
 
             l=(x1,y1,x2,y2)
 
-            if line_length(l)>5:   # küçük çizgileri filtrele
-
-                angle=line_angle(l)
-
-                if angle<10 or abs(angle-90)<10:
-                    lines.append(l)
+            if line_length(l)>150:  # küçük çizgileri sil
+                lines.append(l)
 
 
         if e.dxftype()=="LWPOLYLINE":
@@ -95,23 +90,42 @@ def extract_lines_from_dxf(path):
 
                 l=(x1,y1,x2,y2)
 
-                if line_length(l)>5:
-
-                    angle=line_angle(l)
-
-                    if angle<10 or abs(angle-90)<10:
-                        lines.append(l)
+                if line_length(l)>150:
+                    lines.append(l)
 
     return lines
 
 
 # ------------------------------------------------
-# WALL DETECTION
+# ORIENTATION SPLIT
 # ------------------------------------------------
 
-def detect_wall_pairs(lines,wall_thickness):
+def split_lines(lines):
+
+    horizontal=[]
+    vertical=[]
+
+    for l in lines:
+
+        angle=line_angle(l)
+
+        if angle<10:
+            horizontal.append(l)
+
+        elif abs(angle-90)<10:
+            vertical.append(l)
+
+    return horizontal,vertical
+
+
+# ------------------------------------------------
+# WALL PAIRS
+# ------------------------------------------------
+
+def detect_walls(lines,wall_thickness):
 
     walls=[]
+
     tolerance=wall_thickness*0.5
 
     for i in range(len(lines)):
@@ -130,7 +144,7 @@ def detect_wall_pairs(lines,wall_thickness):
 
                 length=min(line_length(l1),line_length(l2))
 
-                if length>100:   # ölçü çizgilerini filtrele
+                if length>500:  # ölçü çizgilerini sil
                     walls.append((l1,l2))
 
     return walls
@@ -164,7 +178,7 @@ def build_centerlines(walls):
 
 
 # ------------------------------------------------
-# MERGE WALL SEGMENTS
+# MERGE SEGMENTS
 # ------------------------------------------------
 
 def merge_segments(lines):
@@ -172,7 +186,7 @@ def merge_segments(lines):
     merged=[]
     used=[False]*len(lines)
 
-    gap=1200   # kapı boşluğu toleransı (mm)
+    gap=1200
 
     for i in range(len(lines)):
 
@@ -239,7 +253,7 @@ if st.session_state.get("authentication_status"):
 
         kat_yuksekligi=st.number_input("Kat Yüksekliği",value=3.0)
 
-        duvar_kalinligi=st.number_input("Duvar Kalınlığı",value=200.0)
+        duvar_kalinligi=st.number_input("Duvar Kalınlığı (mm)",value=200.0)
 
         birim_fiyat=st.number_input("Birim Fiyat",value=2500)
 
@@ -262,7 +276,12 @@ if st.session_state.get("authentication_status"):
 
         lines=extract_lines_from_dxf(path)
 
-        walls=detect_wall_pairs(lines,duvar_kalinligi)
+        horizontal,vertical=split_lines(lines)
+
+        walls_h=detect_walls(horizontal,duvar_kalinligi)
+        walls_v=detect_walls(vertical,duvar_kalinligi)
+
+        walls=walls_h+walls_v
 
         centers=build_centerlines(walls)
 
@@ -272,9 +291,7 @@ if st.session_state.get("authentication_status"):
         duvar_uzunlugu=sum([line_length(c) for c in centers])
 
 
-        # ------------------------------------------------
         # VISUAL
-        # ------------------------------------------------
 
         fig,ax=plt.subplots(figsize=(10,10))
 
@@ -289,9 +306,7 @@ if st.session_state.get("authentication_status"):
         st.pyplot(fig)
 
 
-        # ------------------------------------------------
         # METRAJ
-        # ------------------------------------------------
 
         duvar_uzunlugu_m=duvar_uzunlugu/1000
 
@@ -305,9 +320,7 @@ if st.session_state.get("authentication_status"):
         col1,col2,col3=st.columns(3)
 
         col1.metric("Duvar Uzunluğu (m)",round(duvar_uzunlugu_m,2))
-
         col2.metric("Duvar Alanı (m²)",round(alan,2))
-
         col3.metric("Maliyet",round(maliyet,2))
 
 
