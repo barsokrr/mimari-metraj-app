@@ -201,7 +201,8 @@ if st.session_state.get("authentication_status"):
                 )
          except Exception as e:
             st.error(f"Hata oluştu: {e}")           
-st.info(f"Tespit edilen duvar sayısı: {duvar_sayisi}")
+            st.info(f"Tespit edilen duvar sayısı: {duvar_sayisi}")
+
 if file_extension in ["jpg", "jpeg", "png"]:
     st.subheader("🖼️ Yapay Zeka (Görsel) Analizi")
     st.success("Dosya yüklendi, Roboflow analizi başlatılıyor...")
@@ -273,6 +274,7 @@ if file_extension in ["jpg", "jpeg", "png"]:
             else:
             
             st.info('Lütfen kullanıcı adı ve şifrenizi giriniz')
+
 
 
 
