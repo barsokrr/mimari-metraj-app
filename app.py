@@ -5,14 +5,155 @@ from yaml.loader import SafeLoader
 import numpy as np
 import cv2
 import pandas as pd
-from inference_sdk import InferenceHTTPClient
 import tempfile
 import math
 import matplotlib.pyplot as plt
 import ezdxf
+from sklearn.cluster import DBSCAN
 
 
-# ---------------- CONFIG ----------------
+# ---------------- GEOMETRY UTILITIES ----------------
+
+def line_length(l):
+    x1,y1,x2,y2 = l
+    return math.dist((x1,y1),(x2,y2))
+
+
+def line_vector(l):
+    x1,y1,x2,y2 = l
+    return np.array([x2-x1,y2-y1])
+
+
+def line_distance(l1,l2):
+
+    x1,y1,x2,y2 = l1
+    x3,y3,x4,y4 = l2
+
+    num = abs((x3-x1)*(y2-y1)-(y3-y1)*(x2-x1))
+    den = math.dist((x1,y1),(x2,y2))
+
+    if den == 0:
+        return 999
+
+    return num/den
+
+
+def parallel(l1,l2):
+
+    v1 = line_vector(l1)
+    v2 = line_vector(l2)
+
+    if np.linalg.norm(v1)==0 or np.linalg.norm(v2)==0:
+        return False
+
+    cos = np.dot(v1,v2)/(np.linalg.norm(v1)*np.linalg.norm(v2))
+
+    return abs(cos)>0.97
+
+
+# ---------------- DXF PARSER ----------------
+
+def extract_lines_from_dxf(path):
+
+    doc = ezdxf.readfile(path)
+    msp = doc.modelspace()
+
+    unit = doc.units
+    scale = 1
+
+    if unit == 4:
+        scale = 0.001
+    elif unit == 5:
+        scale = 0.01
+
+    lines=[]
+
+    for e in msp:
+
+        if e.dxftype()=="LINE":
+
+            x1,y1,_=e.dxf.start
+            x2,y2,_=e.dxf.end
+
+            l=(x1*scale,y1*scale,x2*scale,y2*scale)
+
+            if line_length(l)>0.3:
+                lines.append(l)
+
+        if e.dxftype()=="LWPOLYLINE":
+
+            pts=e.get_points()
+
+            for i in range(len(pts)-1):
+
+                x1,y1=pts[i][0]*scale,pts[i][1]*scale
+                x2,y2=pts[i+1][0]*scale,pts[i+1][1]*scale
+
+                l=(x1,y1,x2,y2)
+
+                if line_length(l)>0.3:
+                    lines.append(l)
+
+    return lines
+
+
+# ---------------- WALL DETECTION ----------------
+
+def detect_wall_pairs(lines,wall_thickness):
+
+    walls=[]
+
+    for i in range(len(lines)):
+
+        for j in range(i+1,len(lines)):
+
+            l1=lines[i]
+            l2=lines[j]
+
+            if not parallel(l1,l2):
+                continue
+
+            d=line_distance(l1,l2)
+
+            if abs(d-wall_thickness)<wall_thickness:
+
+                length=min(line_length(l1),line_length(l2))
+
+                walls.append((l1,l2,length))
+
+    return walls
+
+
+# ---------------- CENTERLINE EXTRACTION ----------------
+
+def centerline(l1,l2):
+
+    x1,y1,x2,y2=l1
+    x3,y3,x4,y4=l2
+
+    cx1=(x1+x3)/2
+    cy1=(y1+y3)/2
+    cx2=(x2+x4)/2
+    cy2=(y2+y4)/2
+
+    return (cx1,cy1,cx2,cy2)
+
+
+# ---------------- WALL NETWORK ----------------
+
+def build_centerlines(walls):
+
+    centers=[]
+
+    for w in walls:
+
+        c=centerline(w[0],w[1])
+        centers.append(c)
+
+    return centers
+
+
+# ---------------- STREAMLIT CONFIG ----------------
 
 with open("config.yaml") as file:
     config = yaml.load(file, Loader=SafeLoader)
@@ -27,264 +168,76 @@ authenticator = stauth.Authenticate(
 authenticator.login(location="main")
 
 
-# ---------------- AUTH ----------------
+# ---------------- APP ----------------
 
 if st.session_state.get("authentication_status"):
 
     with st.sidebar:
 
-        st.title("👤 Profil")
+        st.title("Profil")
         st.write(st.session_state.get("name"))
 
-        sayfa = st.radio(
-            "Menü",
-            ["Ana Sayfa", "Eski Projeler"]
-        )
+        kat_yuksekligi = st.number_input("Kat Yüksekliği",value=3.0)
+        duvar_kalinligi = st.number_input("Duvar Kalınlığı",value=0.20)
+        birim_fiyat = st.number_input("Birim Fiyat",value=2500)
 
-        st.divider()
+        authenticator.logout("Çıkış Yap","sidebar")
 
-        st.header("Maliyet Ayarları")
 
-        kat_yuksekligi = st.number_input(
-            "Kat Yüksekliği (m)",
-            value=3.0
-        )
+    st.title("AI Mimari Metraj (Togal Mantığı)")
 
-        duvar_kalinligi = st.number_input(
-            "Duvar Kalınlığı (m)",
-            value=0.20
-        )
 
-        birim_fiyat = st.number_input(
-            "Birim Fiyat (TL/m3)",
-            value=2500
-        )
+    uploaded_file = st.file_uploader(
+        "Plan yükle",
+        type=["dxf"]
+    )
 
-        st.divider()
 
-        st.header("Görsel Ölçek Ayarı")
+    if uploaded_file:
 
-        referans_metre = st.number_input(
-            "Referans Uzunluk (m)",
-            value=1.0
-        )
+        with tempfile.NamedTemporaryFile(delete=False,suffix=".dxf") as tmp:
 
-        referans_pixel = st.number_input(
-            "Referans Pixel",
-            value=100
-        )
+            tmp.write(uploaded_file.read())
+            path=tmp.name
 
-        authenticator.logout("Çıkış Yap", "sidebar")
 
-    PIXEL_TO_METER = referans_metre / referans_pixel
+        lines=extract_lines_from_dxf(path)
 
-    # ---------------- ANA SAYFA ----------------
+        walls=detect_wall_pairs(lines,duvar_kalinligi)
 
-    if sayfa == "Ana Sayfa":
+        centers=build_centerlines(walls)
 
-        st.title("Akıllı Mimari Metraj Sistemi")
+        duvar_uzunlugu=sum([line_length(c) for c in centers])
 
-        uploaded_file = st.file_uploader(
-            "Plan yükleyin",
-            type=["jpg", "png", "jpeg", "dxf"]
-        )
 
-        if uploaded_file:
+        # --------- GÖRSEL ---------
 
-            ext = uploaded_file.name.split(".")[-1].lower()
+        fig,ax=plt.subplots(figsize=(10,10))
 
-            # --------------------------------------------------
-            # DXF ANALİZİ
-            # --------------------------------------------------
+        for c in centers:
 
-            if ext == "dxf":
+            x1,y1,x2,y2=c
 
-                st.subheader("DXF Plan Analizi")
+            ax.plot([x1,x2],[y1,y2],color="red",linewidth=2)
 
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".dxf") as tmp:
+        ax.set_aspect("equal")
 
-                    tmp.write(uploaded_file.read())
-                    path = tmp.name
+        st.pyplot(fig)
 
-                doc = ezdxf.readfile(path)
-                msp = doc.modelspace()
 
-                wall_layers = [
-                    "wall",
-                    "duvar",
-                    "a-wall",
-                    "mim-wall",
-                    "partition",
-                ]
+        # --------- METRAJ ---------
 
-                duvar_uzunlugu = 0
+        alan=duvar_uzunlugu*kat_yuksekligi
+        hacim=alan*duvar_kalinligi
+        maliyet=hacim*birim_fiyat
 
-                fig, ax = plt.subplots(figsize=(8, 8))
 
-                for entity in msp:
+        col1,col2,col3=st.columns(3)
 
-                    layer = entity.dxf.layer.lower()
+        col1.metric("Duvar Uzunluğu",round(duvar_uzunlugu,2))
+        col2.metric("Duvar Alanı",round(alan,2))
+        col3.metric("Maliyet",round(maliyet,2))
 
-                    if not any(k in layer for k in wall_layers):
-                        continue
-
-                    # ---------- LINE ----------
-
-                    if entity.dxftype() == "LINE":
-
-                        x1, y1, _ = entity.dxf.start
-                        x2, y2, _ = entity.dxf.end
-
-                        length = math.dist((x1, y1), (x2, y2))
-
-                        duvar_uzunlugu += length
-
-                        ax.plot([x1, x2], [y1, y2], color="red")
-
-                    # ---------- LWPOLYLINE ----------
-
-                    if entity.dxftype() == "LWPOLYLINE":
-
-                        pts = entity.get_points()
-
-                        for i in range(len(pts) - 1):
-
-                            x1, y1 = pts[i][0], pts[i][1]
-                            x2, y2 = pts[i + 1][0], pts[i + 1][1]
-
-                            length = math.dist((x1, y1), (x2, y2))
-
-                            duvar_uzunlugu += length
-
-                            ax.plot([x1, x2], [y1, y2], color="red")
-
-                    # ---------- POLYLINE ----------
-
-                    if entity.dxftype() == "POLYLINE":
-
-                        verts = [v.dxf.location for v in entity.vertices]
-
-                        for i in range(len(verts) - 1):
-
-                            x1, y1, _ = verts[i]
-                            x2, y2, _ = verts[i + 1]
-
-                            length = math.dist((x1, y1), (x2, y2))
-
-                            duvar_uzunlugu += length
-
-                            ax.plot([x1, x2], [y1, y2], color="red")
-
-                ax.set_aspect("equal")
-
-                st.pyplot(fig)
-
-                # ----- METRAJ HESABI -----
-
-                duvar_alani = duvar_uzunlugu * kat_yuksekligi
-                duvar_hacmi = duvar_alani * duvar_kalinligi
-                maliyet = duvar_hacmi * birim_fiyat
-
-                st.success(f"Toplam Duvar Uzunluğu: {round(duvar_uzunlugu,2)} m")
-
-                col1, col2, col3 = st.columns(3)
-
-                col1.metric("Duvar Alanı", round(duvar_alani, 2))
-                col2.metric("Duvar Hacmi", round(duvar_hacmi, 2))
-                col3.metric("Maliyet", round(maliyet, 2))
-
-                df = pd.DataFrame({
-
-                    "Kalem": [
-                        "Duvar Uzunluğu",
-                        "Duvar Alanı",
-                        "Duvar Hacmi",
-                        "Tahmini Maliyet",
-                    ],
-
-                    "Değer": [
-                        round(duvar_uzunlugu, 2),
-                        round(duvar_alani, 2),
-                        round(duvar_hacmi, 2),
-                        round(maliyet, 2),
-                    ],
-                })
-
-                st.dataframe(df)
-
-                csv = df.to_csv(index=False).encode("utf-8")
-
-                st.download_button(
-                    "CSV indir",
-                    csv,
-                    "metraj.csv",
-                    "text/csv",
-                )
-
-            # --------------------------------------------------
-            # AI GÖRSEL ANALİZ
-            # --------------------------------------------------
-
-            if ext in ["jpg", "jpeg", "png"]:
-
-                st.subheader("AI Plan Analizi")
-
-                API_KEY = st.secrets["ROBOFLOW_API_KEY"]
-
-                WORKSPACE = "bars-workspace-tcviv"
-                WORKFLOW = "custom-workflow-2"
-
-                file_bytes = np.asarray(
-                    bytearray(uploaded_file.read()),
-                    dtype=np.uint8
-                )
-
-                image = cv2.imdecode(file_bytes, 1)
-
-                st.image(image)
-
-                if st.button("AI Analizi Başlat"):
-
-                    client = InferenceHTTPClient(
-                        api_url="https://serverless.roboflow.com",
-                        api_key=API_KEY,
-                    )
-
-                    result = client.run_workflow(
-                        workspace_name=WORKSPACE,
-                        workflow_id=WORKFLOW,
-                        images={"image": image},
-                    )
-
-                    preds = result[0]["predictions"]["predictions"]
-
-                    duvar_toplam = 0
-
-                    rows = []
-
-                    for i, wall in enumerate(preds):
-
-                        w = wall["width"]
-                        h = wall["height"]
-
-                        pixel_length = max(w, h)
-
-                        metre = pixel_length * PIXEL_TO_METER
-
-                        duvar_toplam += metre
-
-                        rows.append({
-
-                            "Duvar": f"Duvar-{i+1}",
-                            "Uzunluk (m)": round(metre, 2),
-
-                        })
-
-                    df = pd.DataFrame(rows)
-
-                    st.dataframe(df)
-
-                    st.success(f"Toplam Duvar Uzunluğu: {round(duvar_toplam,2)} m")
 
 elif st.session_state.get("authentication_status") is False:
 
