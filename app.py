@@ -200,15 +200,14 @@ if st.session_state.get("authentication_status"):
                     "text/csv"
                 )
             
-                st.info(f"Tespit edilen duvar sayısı: {duvar_sayisi}")
-            
+ try:
+    st.info(f"Tespit edilen duvar sayısı: {duvar_sayisi}")
 except Exception as e:
     st.error(f"DXF dosyası okunurken hata oluştu: {e}")
 
 if file_extension in ["jpg", "jpeg", "png"]:
     st.subheader("🖼️ Yapay Zeka (Görsel) Analizi")
     st.success("Dosya yüklendi, Roboflow analizi başlatılıyor...")
-
 try:
     API_KEY = st.secrets["ROBOFLOW_API_KEY"]
 
@@ -278,6 +277,7 @@ try:
             else:
             
             st.info('Lütfen kullanıcı adı ve şifrenizi giriniz')
+
 
 
 
