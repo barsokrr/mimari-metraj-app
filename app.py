@@ -200,12 +200,13 @@ if st.session_state.get("authentication_status"):
                     "text/csv"
                 )
             
+st.info(f"Tespit edilen duvar sayısı: {duvar_sayisi}")
+
 if file_extension in ["jpg", "jpeg", "png"]:
     st.subheader("🖼️ Yapay Zeka (Görsel) Analizi")
     st.success("Dosya yüklendi, Roboflow analizi başlatılıyor...")
 
     API_KEY = st.secrets["ROBOFLOW_API_KEY"]
-
     WORKSPACE = "bars-workspace-tcviv"
     WORKFLOW = "custom-workflow-2"
     PIXEL_TO_METER_RATIO = 0.02
@@ -272,6 +273,7 @@ if file_extension in ["jpg", "jpeg", "png"]:
             else:
             
             st.info('Lütfen kullanıcı adı ve şifrenizi giriniz')
+
 
 
 
