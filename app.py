@@ -4,101 +4,90 @@ import matplotlib.pyplot as plt
 import tempfile
 import math
 
-def get_length(e):
-    """Koordinat hatasını çözen güvenli uzunluk hesaplayıcı."""
-    try:
-        if e.dxftype() == 'LINE':
-            # Yeni ezdxf versiyonlarında start/end birer tuple'dır
-            p1 = e.dxf.start
-            p2 = e.dxf.end
-            return math.dist((p1[0], p1[1]), (p2[0], p2[1]))
-        
-        elif e.dxftype() in ('LWPOLYLINE', 'POLYLINE'):
-            points = list(e.get_points())
-            L = 0
-            for i in range(len(points) - 1):
-                p1, p2 = points[i], points[i+1]
-                L += math.dist((p1[0], p1[1]), (p2[0], p2[1]))
-            if e.is_closed:
-                p1, p2 = points[-1], points[0]
-                L += math.dist((p1[0], p1[1]), (p2[0], p2[1]))
-            return L
-    except Exception:
-        return 0
-    return 0
+def read_dxf_geometry(path, target_layers):
+    doc = ezdxf.readfile(path)
+    msp = doc.modelspace()
+    polygons = []
 
-def process_entities(entities, target_layers, plot_list):
-    """Objeleri filtreleyip uzunluklarını toplar."""
-    sub_total = 0
-    for e in entities:
-        layer = e.dxf.layer.upper()
-        # Katman filtresi boşsa hepsini al, doluysa sadece hedefi al
-        if not target_layers or any(t.upper() in layer for t in target_layers):
-            length = get_length(e)
-            if length > 0:
-                sub_total += length
-                # Çizim datası hazırla
-                if e.dxftype() == 'LINE':
-                    plot_list.append(([e.dxf.start[0], e.dxf.end[0]], [e.dxf.start[1], e.dxf.end[1]]))
-                elif e.dxftype() in ('LWPOLYLINE', 'POLYLINE'):
-                    pts = list(e.get_points())
-                    plot_list.append(([p[0] for p in pts], [p[1] for p in pts]))
-    return sub_total
+    for e in msp:
+        layer_name = e.dxf.layer.upper()
+        # Katman kontrolü
+        is_target_layer = any(t.upper() in layer_name for t in target_layers)
 
-# --- UI KISMI ---
-st.set_page_config(page_title="Hassas Metraj v3", layout="wide")
-st.title("🏗️ Akıllı Mimari Metraj Sistemi")
+        if is_target_layer:
+            if e.dxftype() in ("LWPOLYLINE", "POLYLINE"):
+                if e.dxftype() == "LWPOLYLINE":
+                    pts = [(p[0], p[1]) for p in e.get_points()]
+                else:
+                    pts = [(v.dxf.location.x, v.dxf.location.y) for v in e.vertices]
+
+                if len(pts) > 1:
+                    # Eğer poligon kapalı değilse ama duvarın bir parçasıysa listeye al
+                    # Görselleştirme için ilk ve son noktayı birleştiriyoruz (tahmini kapatma)
+                    if pts[0] != pts[-1]:
+                        pts.append(pts[0]) 
+                    polygons.append(pts)
+            
+            elif e.dxftype() == "LINE":
+                # Tekil çizgileri de küçük poligonlar gibi işleyelim (opsiyonel)
+                x1, y1, _ = e.dxf.start
+                x2, y2, _ = e.dxf.end
+                polygons.append([(x1, y1), (x2, y2), (x1, y1)])
+
+    return polygons
+
+def polygon_perimeter(poly):
+    L = 0
+    for i in range(len(poly) - 1):
+        L += math.dist(poly[i], poly[i+1])
+    return L
+
+# --- ARAYÜZ ---
+st.set_page_config(page_title="Pro Metraj", layout="wide")
+st.title("🏗️ Akıllı Duvar Metrajı (Gelişmiş Seçim)")
 
 with st.sidebar:
-    st.header("⚙️ Ayarlar")
-    uploaded = st.file_uploader("DXF Dosyası", type=["dxf"])
+    st.header("⚙️ Analiz Ayarları")
+    uploaded = st.file_uploader("DXF Dosyası Seç", type=["dxf"])
+    kat_yuksekligi = st.number_input("Kat Yüksekliği (m)", value=3.0)
     birim = st.selectbox("Çizim Birimi", ["cm", "mm", "m"], index=0)
-    kat_yuk = st.number_input("Kat Yüksekliği (m)", value=3.0)
-    katman_input = st.text_input("Duvar Katmanları (Virgülle ayır)", "DUVAR, WALL, MIM_DUVAR")
-    target_layers = [x.strip() for x in katman_input.split(",")] if katman_input else []
+    katman_input = st.text_input("Duvar Katmanları", "DUVAR, WALL, MIM_DUVAR")
+    target_layers = [x.strip() for x in katman_input.split(",")]
 
 if uploaded:
-    # Birim dönüştürücü
-    bolen = 100 if birim == "cm" else (1000 if birim == "mm" else 1)
+    birim_bolen = 100 if birim == "cm" else (1000 if birim == "mm" else 1)
     
     with tempfile.NamedTemporaryFile(delete=False, suffix=".dxf") as tmp:
         tmp.write(uploaded.read())
         path = tmp.name
 
-    try:
-        doc = ezdxf.readfile(path)
-        msp = doc.modelspace()
-        
-        plot_data = []
-        # 1. Ana plandaki çizgiler
-        total_raw_len = process_entities(msp, target_layers, plot_data)
-        
-        # 2. Blokların (Block) içindeki çizgileri patlat ve oku
-        for insert in msp.query('INSERT'):
-            try:
-                block = doc.blocks[insert.dxf.name]
-                total_raw_len += process_entities(block, target_layers, plot_data)
-            except:
-                continue
+    polygons = read_dxf_geometry(path, target_layers)
 
-        # GÖRSELLEŞTİRME
-        fig, ax = plt.subplots(figsize=(10, 8))
-        for xs, ys in plot_data:
-            ax.plot(xs, ys, color="#e74c3c", linewidth=0.8) # Kırmızı çizgiler
-        
+    if not polygons:
+        st.error("Seçilen katmanlarda uygun obje bulunamadı. Lütfen katman ismini kontrol edin.")
+    else:
+        fig, ax = plt.subplots(figsize=(12, 10))
+        total_raw_perimeter = 0
+
+        for poly in polygons:
+            xs = [p[0] for p in poly]
+            ys = [p[1] for p in poly]
+            # Duvarları boya ve sınırları çiz
+            ax.fill(xs, ys, color="#e67e22", alpha=0.7, edgecolor="black", linewidth=0.8)
+            total_raw_perimeter += polygon_perimeter(poly)
+
         ax.set_aspect("equal")
         ax.axis("off")
         st.pyplot(fig)
+        plt.close(fig)
 
-        # HESAPLAMA (Çift çizgi prensibi: Toplam / 2)
-        final_uzunluk = (total_raw_len / 2) / bolen
-        final_alan = final_uzunluk * kat_yuk
+        # Çevre/2 mantığı ile aks uzunluğu hesabı
+        duvar_m = (total_raw_perimeter / 2) / birim_bolen
+        alan = duvar_m * kat_yuksekligi
 
         st.divider()
-        c1, c2, c3 = st.columns(3)
-        c1.metric("📏 Hesaplanan Uzunluk", f"{round(final_uzunluk, 2)} m")
-        c2.metric("🧱 Duvar Alanı", f"{round(final_alan, 2)} m²")
-        c3.info(f"Hedef: 58.08 m\nSapma: {round(final_uzunluk - 58.08, 2)} m")
-
-    except Exception as e:
-        st.error(f"Dosya işlenirken hata oluştu: {e}")
+        col1, col2 = st.columns(2)
+        col1.metric("📏 Toplam Duvar Uzunluğu", f"{round(duvar_m, 2)} m")
+        col2.metric("🧱 Toplam Duvar Alanı", f"{round(alan, 2)} m²")
+        
+        st.success("Analiz başarıyla tamamlandı.")
