@@ -200,20 +200,15 @@ if st.session_state.get("authentication_status"):
                     "text/csv"
                 )
             
-try:
-    st.info(f"Tespit edilen duvar sayısı: {duvar_sayisi}")
-except Exception as e:
-    st.error(f"DXF dosyası okunurken hata oluştu: {e}")
 if file_extension in ["jpg", "jpeg", "png"]:
     st.subheader("🖼️ Yapay Zeka (Görsel) Analizi")
     st.success("Dosya yüklendi, Roboflow analizi başlatılıyor...")
 
-    try:
-        API_KEY = st.secrets["ROBOFLOW_API_KEY"]
+    API_KEY = st.secrets["ROBOFLOW_API_KEY"]
 
-        WORKSPACE = "bars-workspace-tcviv"
-        WORKFLOW = "custom-workflow-2"
-        PIXEL_TO_METER_RATIO = 0.02
+    WORKSPACE = "bars-workspace-tcviv"
+    WORKFLOW = "custom-workflow-2"
+    PIXEL_TO_METER_RATIO = 0.02
 
     if uploaded_file is not None:
             
@@ -277,6 +272,7 @@ if file_extension in ["jpg", "jpeg", "png"]:
             else:
             
             st.info('Lütfen kullanıcı adı ve şifrenizi giriniz')
+
 
 
 
