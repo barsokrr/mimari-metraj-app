@@ -199,7 +199,7 @@ if st.session_state.get("authentication_status"):
                     "metraj_raporu.csv",
                     "text/csv"
                 )
-            
+except Exception as e:            
 st.info(f"Tespit edilen duvar sayısı: {duvar_sayisi}")
 
 if file_extension in ["jpg", "jpeg", "png"]:
@@ -273,6 +273,7 @@ if file_extension in ["jpg", "jpeg", "png"]:
             else:
             
             st.info('Lütfen kullanıcı adı ve şifrenizi giriniz')
+
 
 
 
