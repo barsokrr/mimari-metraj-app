@@ -4,55 +4,51 @@ import matplotlib.pyplot as plt
 import tempfile
 import math
 
-def read_dxf_geometry(path, target_layers):
-    doc = ezdxf.readfile(path)
-    msp = doc.modelspace()
-    polygons = []
+def get_entity_length(e):
+    """Farklı DXF objelerinin uzunluğunu hesaplar."""
+    if e.dxftype() == 'LINE':
+        return math.dist(e.dxf.start[:2], e.dxf.end[:2])
+    elif e.dxftype() in ('LWPOLYLINE', 'POLYLINE'):
+        points = list(e.get_points())
+        length = 0
+        for i in range(len(points) - 1):
+            length += math.dist(points[i][:2], points[i+1][:2])
+        if e.is_closed:
+            length += math.dist(points[-1][:2], points[0][:2])
+        return length
+    return 0
 
-    for e in msp:
-        layer_name = e.dxf.layer.upper()
-        # Katman kontrolü
-        is_target_layer = any(t.upper() in layer_name for t in target_layers)
-
-        if is_target_layer:
-            if e.dxftype() in ("LWPOLYLINE", "POLYLINE"):
-                if e.dxftype() == "LWPOLYLINE":
-                    pts = [(p[0], p[1]) for p in e.get_points()]
-                else:
-                    pts = [(v.dxf.location.x, v.dxf.location.y) for v in e.vertices]
-
-                if len(pts) > 1:
-                    # Eğer poligon kapalı değilse ama duvarın bir parçasıysa listeye al
-                    # Görselleştirme için ilk ve son noktayı birleştiriyoruz (tahmini kapatma)
-                    if pts[0] != pts[-1]:
-                        pts.append(pts[0]) 
-                    polygons.append(pts)
-            
-            elif e.dxftype() == "LINE":
-                # Tekil çizgileri de küçük poligonlar gibi işleyelim (opsiyonel)
-                x1, y1, _ = e.dxf.start
-                x2, y2, _ = e.dxf.end
-                polygons.append([(x1, y1), (x2, y2), (x1, y1)])
-
-    return polygons
-
-def polygon_perimeter(poly):
-    L = 0
-    for i in range(len(poly) - 1):
-        L += math.dist(poly[i], poly[i+1])
-    return L
+def process_entities(entities, target_layers):
+    """Objeleri tarar ve uzunluk ile görsel veriyi döner."""
+    total_len = 0
+    plot_data = []
+    
+    for e in entities:
+        layer = e.dxf.layer.upper()
+        # Katman kontrolü (Boş bırakılırsa tüm katmanları alır)
+        if not target_layers or any(t.upper() in layer for t in target_layers):
+            length = get_entity_length(e)
+            if length > 0:
+                total_len += length
+                # Görselleştirme için koordinatları sakla
+                if e.dxftype() == 'LINE':
+                    plot_data.append(([e.dxf.start[0], e.dxf.end[0]], [e.dxf.start[1], e.dxf.end[1]]))
+                elif e.dxftype() in ('LWPOLYLINE', 'POLYLINE'):
+                    pts = list(e.get_points())
+                    plot_data.append(([p[0] for p in pts], [p[1] for p in pts]))
+    return total_len, plot_data
 
 # --- ARAYÜZ ---
-st.set_page_config(page_title="Pro Metraj", layout="wide")
-st.title("🏗️ Akıllı Duvar Metrajı (Gelişmiş Seçim)")
+st.set_page_config(page_title="Hassas Metraj", layout="wide")
+st.title("🏗️ Profesyonel Mimari Metraj (Derin Analiz)")
 
 with st.sidebar:
-    st.header("⚙️ Analiz Ayarları")
-    uploaded = st.file_uploader("DXF Dosyası Seç", type=["dxf"])
-    kat_yuksekligi = st.number_input("Kat Yüksekliği (m)", value=3.0)
+    st.header("⚙️ Ayarlar")
+    uploaded = st.file_uploader("DXF Dosyası", type=["dxf"])
     birim = st.selectbox("Çizim Birimi", ["cm", "mm", "m"], index=0)
-    katman_input = st.text_input("Duvar Katmanları", "DUVAR, WALL, MIM_DUVAR")
-    target_layers = [x.strip() for x in katman_input.split(",")]
+    kat_yuk = st.number_input("Kat Yüksekliği (m)", value=3.0)
+    katman_input = st.text_input("Katman Filtresi (Boş bırakırsanız hepsini sayar)", "DUVAR, WALL")
+    target_layers = [x.strip() for x in katman_input.split(",")] if katman_input else []
 
 if uploaded:
     birim_bolen = 100 if birim == "cm" else (1000 if birim == "mm" else 1)
@@ -61,33 +57,30 @@ if uploaded:
         tmp.write(uploaded.read())
         path = tmp.name
 
-    polygons = read_dxf_geometry(path, target_layers)
+    doc = ezdxf.readfile(path)
+    msp = doc.modelspace()
+    
+    # 1. Modelspace içindeki ana objeleri tara
+    total_raw_len, plot_info = process_entities(msp, target_layers)
+    
+    # 2. BLOKLARIN İÇİNE GİR (En kritik kısım)
+    # Planda 'Insert' olarak duran her şeyin içine bakıyoruz
+    for insert in msp.query('INSERT'):
+        block = doc.blocks[insert.dxf.name]
+        b_len, b_plot = process_entities(block, target_layers)
+        total_raw_len += b_len
+        # Blok içindeki çizimleri de ekrana ekle (basit gösterim)
+        plot_info.extend(b_plot)
 
-    if not polygons:
-        st.error("Seçilen katmanlarda uygun obje bulunamadı. Lütfen katman ismini kontrol edin.")
-    else:
-        fig, ax = plt.subplots(figsize=(12, 10))
-        total_raw_perimeter = 0
+    # GÖRSELLEŞTİRME
+    fig, ax = plt.subplots(figsize=(12, 10))
+    for x_coords, y_coords in plot_info:
+        ax.plot(x_coords, y_coords, color="red", linewidth=1.2, alpha=0.8)
+    
+    ax.set_aspect("equal")
+    ax.axis("off")
+    st.pyplot(fig)
 
-        for poly in polygons:
-            xs = [p[0] for p in poly]
-            ys = [p[1] for p in poly]
-            # Duvarları boya ve sınırları çiz
-            ax.fill(xs, ys, color="#e67e22", alpha=0.7, edgecolor="black", linewidth=0.8)
-            total_raw_perimeter += polygon_perimeter(poly)
-
-        ax.set_aspect("equal")
-        ax.axis("off")
-        st.pyplot(fig)
-        plt.close(fig)
-
-        # Çevre/2 mantığı ile aks uzunluğu hesabı
-        duvar_m = (total_raw_perimeter / 2) / birim_bolen
-        alan = duvar_m * kat_yuksekligi
-
-        st.divider()
-        col1, col2 = st.columns(2)
-        col1.metric("📏 Toplam Duvar Uzunluğu", f"{round(duvar_m, 2)} m")
-        col2.metric("🧱 Toplam Duvar Alanı", f"{round(alan, 2)} m²")
-        
-        st.success("Analiz başarıyla tamamlandı.")
+    # HESAPLAMA (Eğer duvarlar çift çizgiyse /2 yapmalıyız, tek çizgiyse direkt almalıyız)
+    # Genelde mimari planlar çift çizgidir.
+    duvar_m = (total_raw_len / 2)
