@@ -1,37 +1,30 @@
 import streamlit as st
-import streamlit_authenticator as stauth
-import yaml
-from yaml.loader import SafeLoader
-import numpy as np
-import tempfile
-import math
-import matplotlib.pyplot as plt
 import ezdxf
+import math
+import numpy as np
+import matplotlib.pyplot as plt
+import tempfile
 
-
-# ------------------------------------------------
+# -----------------------------
 # GEOMETRY
-# ------------------------------------------------
+# -----------------------------
 
-def line_length(l):
+def length(l):
     x1,y1,x2,y2=l
     return math.dist((x1,y1),(x2,y2))
 
-
-def line_angle(l):
+def angle(l):
     x1,y1,x2,y2=l
     return abs(math.degrees(math.atan2(y2-y1,x2-x1)))
 
-
-def line_vector(l):
+def vector(l):
     x1,y1,x2,y2=l
     return np.array([x2-x1,y2-y1])
 
-
 def parallel(l1,l2):
 
-    v1=line_vector(l1)
-    v2=line_vector(l2)
+    v1=vector(l1)
+    v2=vector(l2)
 
     if np.linalg.norm(v1)==0 or np.linalg.norm(v2)==0:
         return False
@@ -41,7 +34,7 @@ def parallel(l1,l2):
     return abs(cos)>0.99
 
 
-def line_distance(l1,l2):
+def distance(l1,l2):
 
     x1,y1,x2,y2=l1
     x3,y3,x4,y4=l2
@@ -55,11 +48,11 @@ def line_distance(l1,l2):
     return num/den
 
 
-# ------------------------------------------------
-# DXF PARSER
-# ------------------------------------------------
+# -----------------------------
+# DXF OKUMA
+# -----------------------------
 
-def extract_lines_from_dxf(path):
+def read_dxf(path):
 
     doc=ezdxf.readfile(path)
     msp=doc.modelspace()
@@ -75,9 +68,8 @@ def extract_lines_from_dxf(path):
 
             l=(x1,y1,x2,y2)
 
-            if line_length(l)>150:  # küçük çizgileri sil
+            if length(l)>200:
                 lines.append(l)
-
 
         if e.dxftype()=="LWPOLYLINE":
 
@@ -90,43 +82,43 @@ def extract_lines_from_dxf(path):
 
                 l=(x1,y1,x2,y2)
 
-                if line_length(l)>150:
+                if length(l)>200:
                     lines.append(l)
 
     return lines
 
 
-# ------------------------------------------------
-# ORIENTATION SPLIT
-# ------------------------------------------------
+# -----------------------------
+# YATAY / DİKEY AYIR
+# -----------------------------
 
-def split_lines(lines):
+def split_orientation(lines):
 
-    horizontal=[]
-    vertical=[]
+    h=[]
+    v=[]
 
     for l in lines:
 
-        angle=line_angle(l)
+        a=angle(l)
 
-        if angle<10:
-            horizontal.append(l)
+        if a<10:
+            h.append(l)
 
-        elif abs(angle-90)<10:
-            vertical.append(l)
+        elif abs(a-90)<10:
+            v.append(l)
 
-    return horizontal,vertical
+    return h,v
 
 
-# ------------------------------------------------
-# WALL PAIRS
-# ------------------------------------------------
+# -----------------------------
+# DUVAR ÇİFTİ BUL
+# -----------------------------
 
-def detect_walls(lines,wall_thickness):
+def detect_wall_pairs(lines,wall_thickness):
 
     walls=[]
 
-    tolerance=wall_thickness*0.5
+    tol=wall_thickness*0.4
 
     for i in range(len(lines)):
 
@@ -138,21 +130,20 @@ def detect_walls(lines,wall_thickness):
             if not parallel(l1,l2):
                 continue
 
-            d=line_distance(l1,l2)
+            d=distance(l1,l2)
 
-            if abs(d-wall_thickness)<tolerance:
+            if abs(d-wall_thickness)<tol:
 
-                length=min(line_length(l1),line_length(l2))
+                if min(length(l1),length(l2))>800:
 
-                if length>500:  # ölçü çizgilerini sil
                     walls.append((l1,l2))
 
     return walls
 
 
-# ------------------------------------------------
-# CENTERLINE
-# ------------------------------------------------
+# -----------------------------
+# DUVAR EKSENİ
+# -----------------------------
 
 def centerline(l1,l2):
 
@@ -177,16 +168,16 @@ def build_centerlines(walls):
     return centers
 
 
-# ------------------------------------------------
-# MERGE SEGMENTS
-# ------------------------------------------------
+# -----------------------------
+# DUVAR BİRLEŞTİR
+# -----------------------------
 
 def merge_segments(lines):
 
     merged=[]
     used=[False]*len(lines)
 
-    gap=1200
+    gap=1500
 
     for i in range(len(lines)):
 
@@ -204,7 +195,7 @@ def merge_segments(lines):
 
             if parallel(lines[i],l2):
 
-                if line_distance(lines[i],l2)<5:
+                if distance(lines[i],l2)<10:
 
                     x3,y3,x4,y4=l2
 
@@ -222,112 +213,93 @@ def merge_segments(lines):
     return merged
 
 
-# ------------------------------------------------
-# AUTH
-# ------------------------------------------------
+# -----------------------------
+# RECTANGLE DUVAR
+# -----------------------------
 
-with open("config.yaml") as file:
-    config=yaml.load(file,Loader=SafeLoader)
+def draw_wall_rect(ax,line,thickness):
 
-authenticator=stauth.Authenticate(
-    config["credentials"],
-    config["cookie"]["name"],
-    config["cookie"]["key"],
-    config["cookie"]["expiry_days"],
-)
+    x1,y1,x2,y2=line
 
-authenticator.login(location="main")
+    dx=x2-x1
+    dy=y2-y1
 
+    L=math.sqrt(dx*dx+dy*dy)
 
-# ------------------------------------------------
-# APP
-# ------------------------------------------------
+    nx=-dy/L
+    ny=dx/L
 
-if st.session_state.get("authentication_status"):
+    t=thickness/2
 
-    with st.sidebar:
+    p1=(x1+nx*t,y1+ny*t)
+    p2=(x2+nx*t,y2+ny*t)
+    p3=(x2-nx*t,y2-ny*t)
+    p4=(x1-nx*t,y1-ny*t)
 
-        st.title("Profil")
+    xs=[p1[0],p2[0],p3[0],p4[0],p1[0]]
+    ys=[p1[1],p2[1],p3[1],p4[1],p1[1]]
 
-        st.write(st.session_state.get("name"))
-
-        kat_yuksekligi=st.number_input("Kat Yüksekliği",value=3.0)
-
-        duvar_kalinligi=st.number_input("Duvar Kalınlığı (mm)",value=200.0)
-
-        birim_fiyat=st.number_input("Birim Fiyat",value=2500)
-
-        authenticator.logout("Çıkış Yap","sidebar")
+    ax.fill(xs,ys,color="yellow",alpha=0.8)
 
 
-    st.title("AI Mimari Metraj")
+# -----------------------------
+# STREAMLIT
+# -----------------------------
+
+st.title("AI Mimari Duvar Metrajı")
+
+uploaded=st.file_uploader("DXF Plan Yükle",type=["dxf"])
+
+kat_yuksekligi=st.number_input("Kat Yüksekliği (m)",value=3.0)
+
+duvar_kalinligi=st.number_input("Duvar Kalınlığı (mm)",value=200.0)
 
 
-    uploaded_file=st.file_uploader("Plan yükle",type=["dxf"])
+if uploaded:
+
+    with tempfile.NamedTemporaryFile(delete=False,suffix=".dxf") as tmp:
+
+        tmp.write(uploaded.read())
+        path=tmp.name
 
 
-    if uploaded_file:
+    lines=read_dxf(path)
 
-        with tempfile.NamedTemporaryFile(delete=False,suffix=".dxf") as tmp:
+    h,v=split_orientation(lines)
 
-            tmp.write(uploaded_file.read())
-            path=tmp.name
+    walls1=detect_wall_pairs(h,duvar_kalinligi)
+    walls2=detect_wall_pairs(v,duvar_kalinligi)
 
+    walls=walls1+walls2
 
-        lines=extract_lines_from_dxf(path)
+    centers=build_centerlines(walls)
 
-        horizontal,vertical=split_lines(lines)
-
-        walls_h=detect_walls(horizontal,duvar_kalinligi)
-        walls_v=detect_walls(vertical,duvar_kalinligi)
-
-        walls=walls_h+walls_v
-
-        centers=build_centerlines(walls)
-
-        centers=merge_segments(centers)
+    centers=merge_segments(centers)
 
 
-        duvar_uzunlugu=sum([line_length(c) for c in centers])
+    total=sum([length(c) for c in centers])
+
+    total_m=total/1000
+
+    area=total_m*kat_yuksekligi
 
 
-        # VISUAL
+    # -----------------------------
+    # ÇİZİM
+    # -----------------------------
 
-        fig,ax=plt.subplots(figsize=(10,10))
+    fig,ax=plt.subplots(figsize=(10,10))
 
-        for c in centers:
+    for c in centers:
+        draw_wall_rect(ax,c,duvar_kalinligi)
 
-            x1,y1,x2,y2=c
+    ax.set_aspect("equal")
+    ax.axis("off")
 
-            ax.plot([x1,x2],[y1,y2],color="red",linewidth=3)
-
-        ax.set_aspect("equal")
-
-        st.pyplot(fig)
-
-
-        # METRAJ
-
-        duvar_uzunlugu_m=duvar_uzunlugu/1000
-
-        alan=duvar_uzunlugu_m*kat_yuksekligi
-
-        hacim=alan*(duvar_kalinligi/1000)
-
-        maliyet=hacim*birim_fiyat
+    st.pyplot(fig)
 
 
-        col1,col2,col3=st.columns(3)
+    col1,col2=st.columns(2)
 
-        col1.metric("Duvar Uzunluğu (m)",round(duvar_uzunlugu_m,2))
-        col2.metric("Duvar Alanı (m²)",round(alan,2))
-        col3.metric("Maliyet",round(maliyet,2))
-
-
-elif st.session_state.get("authentication_status") is False:
-
-    st.error("Kullanıcı adı veya şifre hatalı")
-
-else:
-
-    st.info("Lütfen giriş yapınız")
+    col1.metric("Duvar Uzunluğu (m)",round(total_m,2))
+    col2.metric("Duvar Alanı (m²)",round(area,2))
