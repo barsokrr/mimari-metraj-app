@@ -10,11 +10,18 @@ import matplotlib.pyplot as plt
 import ezdxf
 
 
-# ---------------- GEOMETRY ----------------
+# ------------------------------------------------
+# GEOMETRY
+# ------------------------------------------------
 
 def line_length(l):
     x1,y1,x2,y2 = l
     return math.dist((x1,y1),(x2,y2))
+
+
+def line_angle(l):
+    x1,y1,x2,y2 = l
+    return abs(math.degrees(math.atan2(y2-y1,x2-x1)))
 
 
 def line_vector(l):
@@ -22,12 +29,17 @@ def line_vector(l):
     return np.array([x2-x1,y2-y1])
 
 
-def line_angle(l):
+def parallel(l1,l2):
 
-    x1,y1,x2,y2=l
-    angle=abs(math.degrees(math.atan2(y2-y1,x2-x1)))
+    v1=line_vector(l1)
+    v2=line_vector(l2)
 
-    return angle
+    if np.linalg.norm(v1)==0 or np.linalg.norm(v2)==0:
+        return False
+
+    cos=np.dot(v1,v2)/(np.linalg.norm(v1)*np.linalg.norm(v2))
+
+    return abs(cos)>0.98
 
 
 def line_distance(l1,l2):
@@ -44,25 +56,14 @@ def line_distance(l1,l2):
     return num/den
 
 
-def parallel(l1,l2):
-
-    v1=line_vector(l1)
-    v2=line_vector(l2)
-
-    if np.linalg.norm(v1)==0 or np.linalg.norm(v2)==0:
-        return False
-
-    cos=np.dot(v1,v2)/(np.linalg.norm(v1)*np.linalg.norm(v2))
-
-    return abs(cos)>0.97
-
-
-# ---------------- DXF PARSER ----------------
+# ------------------------------------------------
+# DXF PARSER
+# ------------------------------------------------
 
 def extract_lines_from_dxf(path):
 
-    doc=ezdxf.readfile(path)
-    msp=doc.modelspace()
+    doc = ezdxf.readfile(path)
+    msp = doc.modelspace()
 
     lines=[]
 
@@ -70,21 +71,22 @@ def extract_lines_from_dxf(path):
 
         if e.dxftype()=="LINE":
 
-            x1,y1,_=e.dxf.start
-            x2,y2,_=e.dxf.end
+            x1,y1,_ = e.dxf.start
+            x2,y2,_ = e.dxf.end
 
             l=(x1,y1,x2,y2)
 
-            if line_length(l)>0.5:
+            if line_length(l)>5:   # küçük çizgileri filtrele
 
                 angle=line_angle(l)
 
                 if angle<10 or abs(angle-90)<10:
                     lines.append(l)
 
+
         if e.dxftype()=="LWPOLYLINE":
 
-            pts=e.get_points()
+            pts=list(e.get_points())
 
             for i in range(len(pts)-1):
 
@@ -93,7 +95,7 @@ def extract_lines_from_dxf(path):
 
                 l=(x1,y1,x2,y2)
 
-                if line_length(l)>0.5:
+                if line_length(l)>5:
 
                     angle=line_angle(l)
 
@@ -103,13 +105,14 @@ def extract_lines_from_dxf(path):
     return lines
 
 
-# ---------------- WALL DETECTION ----------------
+# ------------------------------------------------
+# WALL DETECTION
+# ------------------------------------------------
 
 def detect_wall_pairs(lines,wall_thickness):
 
     walls=[]
-
-    tolerance=wall_thickness*0.6
+    tolerance=wall_thickness*0.5
 
     for i in range(len(lines)):
 
@@ -127,12 +130,15 @@ def detect_wall_pairs(lines,wall_thickness):
 
                 length=min(line_length(l1),line_length(l2))
 
-                walls.append((l1,l2,length))
+                if length>100:   # ölçü çizgilerini filtrele
+                    walls.append((l1,l2))
 
     return walls
 
 
-# ---------------- CENTERLINE ----------------
+# ------------------------------------------------
+# CENTERLINE
+# ------------------------------------------------
 
 def centerline(l1,l2):
 
@@ -147,35 +153,33 @@ def centerline(l1,l2):
     return (cx1,cy1,cx2,cy2)
 
 
-# ---------------- CENTERLINES ----------------
-
 def build_centerlines(walls):
 
     centers=[]
 
     for w in walls:
-
-        c=centerline(w[0],w[1])
-        centers.append(c)
+        centers.append(centerline(w[0],w[1]))
 
     return centers
 
 
-# ---------------- MERGE SEGMENTS ----------------
+# ------------------------------------------------
+# MERGE WALL SEGMENTS
+# ------------------------------------------------
 
-def merge_centerlines(lines):
+def merge_segments(lines):
 
     merged=[]
-
     used=[False]*len(lines)
+
+    gap=1200   # kapı boşluğu toleransı (mm)
 
     for i in range(len(lines)):
 
         if used[i]:
             continue
 
-        l1=lines[i]
-        x1,y1,x2,y2=l1
+        x1,y1,x2,y2=lines[i]
 
         for j in range(i+1,len(lines)):
 
@@ -184,25 +188,29 @@ def merge_centerlines(lines):
 
             l2=lines[j]
 
-            if parallel(l1,l2):
+            if parallel(lines[i],l2):
 
-                if line_distance(l1,l2)<0.05:
+                if line_distance(lines[i],l2)<5:
 
                     x3,y3,x4,y4=l2
 
-                    x1=min(x1,x3)
-                    y1=min(y1,y3)
-                    x2=max(x2,x4)
-                    y2=max(y2,y4)
+                    if abs(x2-x3)<gap or abs(y2-y3)<gap:
 
-                    used[j]=True
+                        x1=min(x1,x3)
+                        y1=min(y1,y3)
+                        x2=max(x2,x4)
+                        y2=max(y2,y4)
+
+                        used[j]=True
 
         merged.append((x1,y1,x2,y2))
 
     return merged
 
 
-# ---------------- AUTH ----------------
+# ------------------------------------------------
+# AUTH
+# ------------------------------------------------
 
 with open("config.yaml") as file:
     config=yaml.load(file,Loader=SafeLoader)
@@ -217,17 +225,22 @@ authenticator=stauth.Authenticate(
 authenticator.login(location="main")
 
 
-# ---------------- APP ----------------
+# ------------------------------------------------
+# APP
+# ------------------------------------------------
 
 if st.session_state.get("authentication_status"):
 
     with st.sidebar:
 
         st.title("Profil")
+
         st.write(st.session_state.get("name"))
 
         kat_yuksekligi=st.number_input("Kat Yüksekliği",value=3.0)
-        duvar_kalinligi=st.number_input("Duvar Kalınlığı",value=0.20)
+
+        duvar_kalinligi=st.number_input("Duvar Kalınlığı",value=200.0)
+
         birim_fiyat=st.number_input("Birim Fiyat",value=2500)
 
         authenticator.logout("Çıkış Yap","sidebar")
@@ -236,10 +249,7 @@ if st.session_state.get("authentication_status"):
     st.title("AI Mimari Metraj")
 
 
-    uploaded_file=st.file_uploader(
-        "Plan yükle",
-        type=["dxf"]
-    )
+    uploaded_file=st.file_uploader("Plan yükle",type=["dxf"])
 
 
     if uploaded_file:
@@ -256,36 +266,48 @@ if st.session_state.get("authentication_status"):
 
         centers=build_centerlines(walls)
 
-        centers=merge_centerlines(centers)
+        centers=merge_segments(centers)
+
 
         duvar_uzunlugu=sum([line_length(c) for c in centers])
 
 
-        # -------- GÖRSEL --------
+        # ------------------------------------------------
+        # VISUAL
+        # ------------------------------------------------
 
         fig,ax=plt.subplots(figsize=(10,10))
 
         for c in centers:
 
             x1,y1,x2,y2=c
-            ax.plot([x1,x2],[y1,y2],color="red",linewidth=2)
+
+            ax.plot([x1,x2],[y1,y2],color="red",linewidth=3)
 
         ax.set_aspect("equal")
 
         st.pyplot(fig)
 
 
-        # -------- METRAJ --------
+        # ------------------------------------------------
+        # METRAJ
+        # ------------------------------------------------
 
-        alan=duvar_uzunlugu*kat_yuksekligi
-        hacim=alan*duvar_kalinligi
+        duvar_uzunlugu_m=duvar_uzunlugu/1000
+
+        alan=duvar_uzunlugu_m*kat_yuksekligi
+
+        hacim=alan*(duvar_kalinligi/1000)
+
         maliyet=hacim*birim_fiyat
 
 
         col1,col2,col3=st.columns(3)
 
-        col1.metric("Duvar Uzunluğu",round(duvar_uzunlugu,2))
-        col2.metric("Duvar Alanı",round(alan,2))
+        col1.metric("Duvar Uzunluğu (m)",round(duvar_uzunlugu_m,2))
+
+        col2.metric("Duvar Alanı (m²)",round(alan,2))
+
         col3.metric("Maliyet",round(maliyet,2))
 
 
