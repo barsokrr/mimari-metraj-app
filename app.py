@@ -55,8 +55,10 @@ if st.session_state.get("authentication_status"):
         file_extension = uploaded_file.name.split('.')[-1].lower()
 
         if file_extension == 'dxf':
+            
             st.subheader("📏 AutoCAD (DXF) Analizi")
-             try:
+            
+            try:
                 import ezdxf
                 import tempfile
                 import math
@@ -279,6 +281,7 @@ if st.session_state.get("authentication_status"):
             else:
             
             st.info('Lütfen kullanıcı adı ve şifrenizi giriniz')
+
 
 
 
