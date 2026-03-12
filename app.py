@@ -9,7 +9,7 @@ import tempfile
 import math
 import matplotlib.pyplot as plt
 import ezdxf
-from sklearn.cluster import DBSCAN
+
 
 
 # ---------------- GEOMETRY UTILITIES ----------------
@@ -246,3 +246,4 @@ elif st.session_state.get("authentication_status") is False:
 else:
 
     st.info("Lütfen giriş yapınız")
+
