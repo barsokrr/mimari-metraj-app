@@ -56,155 +56,152 @@ if st.session_state.get("authentication_status"):
 
         if file_extension == 'dxf':
             st.subheader("📏 AutoCAD (DXF) Analizi")
-           try:
-                import ezdxf
-                import tempfile
-                import math
-                import pandas as pd
-            
-                kat_yuksekligi = st.session_state.get("kat_yuksekligi",3.0)
-                duvar_kalinligi = st.session_state.get("duvar_kalinligi",0.20)
-                birim_fiyat = st.session_state.get("birim_fiyat",2500)
-            
-                with tempfile.NamedTemporaryFile(delete=False,suffix=".dxf") as tmp:
-                    tmp.write(uploaded_file.read())
-                    tmp_path = tmp.name
-            
-                doc = ezdxf.readfile(tmp_path)
-                msp = doc.modelspace()
-            
-                duvar_uzunlugu = 0
-                duvar_sayisi = 0
-            
-                segments=[]
-            
-                wall_keywords=["wall","duvar","a-wall","mim-wall"]
-            
-                for entity in msp:
-            
-                    if entity.dxftype()=="LINE":
-            
-                        start=entity.dxf.start
-                        end=entity.dxf.end
-            
-                        x1,y1=start.x,start.y
-                        x2,y2=end.x,end.y
-            
-                        uzunluk=math.sqrt((x2-x1)**2+(y2-y1)**2)
-            
-                        layer=entity.dxf.layer.lower()
-            
-                        segments.append((x1,y1,x2,y2))
-            
-                        if any(k in layer for k in wall_keywords):
-                            duvar_uzunlugu+=uzunluk
-                            duvar_sayisi+=1
-            
-            
-                    elif entity.dxftype()=="LWPOLYLINE":
-            
-                        layer=entity.dxf.layer.lower()
-            
-                        pts=entity.get_points()
-            
-                        for i in range(len(pts)-1):
-            
-                            x1,y1=pts[i][0],pts[i][1]
-                            x2,y2=pts[i+1][0],pts[i+1][1]
-            
-                            uzunluk=math.sqrt((x2-x1)**2+(y2-y1)**2)
-            
-                            segments.append((x1,y1,x2,y2))
-            
-                            if any(k in layer for k in wall_keywords):
-                                duvar_uzunlugu+=uzunluk
-                                duvar_sayisi+=1
-            
-            
-                duvar_alani=duvar_uzunlugu*kat_yuksekligi
-                duvar_hacmi=duvar_alani*duvar_kalinligi
-                maliyet=duvar_hacmi*birim_fiyat
-            
-            
-                xs=[]
-                ys=[]
-            
-                for s in segments:
-                    xs.extend([s[0],s[2]])
-                    ys.extend([s[1],s[3]])
-            
-                if len(xs)>0:
-            
-                    genislik=max(xs)-min(xs)
-                    yukseklik=max(ys)-min(ys)
-            
-                    plan_alani=genislik*yukseklik
-            
-                else:
-            
-                    plan_alani=0
-            
-            
-                ortalama_oda=20
-                oda_sayisi=int(plan_alani/ortalama_oda)
-            
-            
-                st.success(f"Toplam Duvar Uzunluğu: {round(duvar_uzunlugu,2)} m")
-            
-                col1,col2,col3=st.columns(3)
-            
-                col1.metric("Duvar Alanı m²",round(duvar_alani,2))
-                col2.metric("Duvar Hacmi m³",round(duvar_hacmi,2))
-                col3.metric("Tahmini Maliyet TL",round(maliyet,2))
-            
-                st.subheader("Plan Analizi")
-            
-                col4,col5=st.columns(2)
-            
-                col4.metric("Plan Alanı",round(plan_alani,2))
-                col5.metric("Tahmini Oda Sayısı",oda_sayisi)
-            
-            
-                data={
-            
-                "Kalem":[
-                "Duvar Uzunluğu",
-                "Duvar Alanı",
-                "Duvar Hacmi",
-                "Tahmini Maliyet"
-                ],
-            
-                "Değer":[
-                round(duvar_uzunlugu,2),
-                round(duvar_alani,2),
-                round(duvar_hacmi,2),
-                round(maliyet,2)
-                ]
-            
-                }
-            
-                df=pd.DataFrame(data)
-            
-                st.subheader("Metraj Tablosu")
-            
-                st.dataframe(df)
-            
-                csv=df.to_csv(index=False).encode("utf-8")
-            
-                st.download_button(
-                    "Metraj Raporunu İndir (CSV)",
-                    csv,
-                    "metraj_raporu.csv",
-                    "text/csv"
-                )
-            
-                st.info(f"Tespit edilen duvar sayısı: {duvar_sayisi}")
-            
-            except Exception as e:
-                st.error(f"DXF dosyası okunurken hata oluştu: {e}")
-                
-            except Exception as e:
-                st.error(f"DXF dosyası okunurken hata oluştu: {e}")
+             try:
+        import ezdxf
+        import tempfile
+        import math
+        import pandas as pd
+
+        kat_yuksekligi = st.session_state.get("kat_yuksekligi",3.0)
+        duvar_kalinligi = st.session_state.get("duvar_kalinligi",0.20)
+        birim_fiyat = st.session_state.get("birim_fiyat",2500)
+
+        with tempfile.NamedTemporaryFile(delete=False,suffix=".dxf") as tmp:
+            tmp.write(uploaded_file.read())
+            tmp_path = tmp.name
+
+        doc = ezdxf.readfile(tmp_path)
+        msp = doc.modelspace()
+
+        duvar_uzunlugu = 0
+        duvar_sayisi = 0
+
+        segments=[]
+
+        wall_keywords=["wall","duvar","a-wall","mim-wall"]
+
+        for entity in msp:
+
+            if entity.dxftype()=="LINE":
+
+                start=entity.dxf.start
+                end=entity.dxf.end
+
+                x1,y1=start.x,start.y
+                x2,y2=end.x,end.y
+
+                uzunluk=math.sqrt((x2-x1)**2+(y2-y1)**2)
+
+                layer=entity.dxf.layer.lower()
+
+                segments.append((x1,y1,x2,y2))
+
+                if any(k in layer for k in wall_keywords):
+                    duvar_uzunlugu+=uzunluk
+                    duvar_sayisi+=1
+
+
+            elif entity.dxftype()=="LWPOLYLINE":
+
+                layer=entity.dxf.layer.lower()
+
+                pts=entity.get_points()
+
+                for i in range(len(pts)-1):
+
+                    x1,y1=pts[i][0],pts[i][1]
+                    x2,y2=pts[i+1][0],pts[i+1][1]
+
+                    uzunluk=math.sqrt((x2-x1)**2+(y2-y1)**2)
+
+                    segments.append((x1,y1,x2,y2))
+
+                    if any(k in layer for k in wall_keywords):
+                        duvar_uzunlugu+=uzunluk
+                        duvar_sayisi+=1
+
+
+        duvar_alani=duvar_uzunlugu*kat_yuksekligi
+        duvar_hacmi=duvar_alani*duvar_kalinligi
+        maliyet=duvar_hacmi*birim_fiyat
+
+
+        xs=[]
+        ys=[]
+
+        for s in segments:
+            xs.extend([s[0],s[2]])
+            ys.extend([s[1],s[3]])
+
+        if len(xs)>0:
+
+            genislik=max(xs)-min(xs)
+            yukseklik=max(ys)-min(ys)
+
+            plan_alani=genislik*yukseklik
+
+        else:
+
+            plan_alani=0
+
+
+        ortalama_oda=20
+        oda_sayisi=int(plan_alani/ortalama_oda)
+
+
+        st.success(f"Toplam Duvar Uzunluğu: {round(duvar_uzunlugu,2)} m")
+
+        col1,col2,col3=st.columns(3)
+
+        col1.metric("Duvar Alanı m²",round(duvar_alani,2))
+        col2.metric("Duvar Hacmi m³",round(duvar_hacmi,2))
+        col3.metric("Tahmini Maliyet TL",round(maliyet,2))
+
+        st.subheader("Plan Analizi")
+
+        col4,col5=st.columns(2)
+
+        col4.metric("Plan Alanı",round(plan_alani,2))
+        col5.metric("Tahmini Oda Sayısı",oda_sayisi)
+
+
+        data={
+
+        "Kalem":[
+        "Duvar Uzunluğu",
+        "Duvar Alanı",
+        "Duvar Hacmi",
+        "Tahmini Maliyet"
+        ],
+
+        "Değer":[
+        round(duvar_uzunlugu,2),
+        round(duvar_alani,2),
+        round(duvar_hacmi,2),
+        round(maliyet,2)
+        ]
+
+        }
+
+        df=pd.DataFrame(data)
+
+        st.subheader("Metraj Tablosu")
+
+        st.dataframe(df)
+
+        csv=df.to_csv(index=False).encode("utf-8")
+
+        st.download_button(
+            "Metraj Raporunu İndir (CSV)",
+            csv,
+            "metraj_raporu.csv",
+            "text/csv"
+        )
+
+        st.info(f"Tespit edilen duvar sayısı: {duvar_sayisi}")
+
+    except Exception as e:
+        st.error(f"DXF dosyası okunurken hata oluştu: {e}")
         else:
             # BURASI SENİN MEVCUT ROBOFLOW ANALİZ KODLARIN (Resimler için)
             st.subheader("🖼️ Yapay Zeka (Görsel) Analizi")
@@ -282,6 +279,7 @@ elif st.session_state.get("authentication_status") is False:
 else:
 
     st.info('Lütfen kullanıcı adı ve şifrenizi giriniz')
+
 
 
 
