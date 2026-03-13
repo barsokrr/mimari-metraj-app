@@ -8,3 +8,5 @@ ezdxf
 inference-sdk
 scikit-learn
 PyYAML
+pdfplumber
+fpdf
