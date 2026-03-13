@@ -55,7 +55,7 @@ def calculate_total_length(geometries):
 
 # --- ARAYÜZ ---
 st.set_page_config(page_title="Mimari Metraj Pro", layout="wide")
-st.title("🏗️ Duvar Metraj Paneli")
+st.title("🏗️ ELİFİM İÇİN DUVAR METRAJI")
 
 with st.sidebar:
     st.header("⚙️ Analiz Ayarları")
@@ -115,4 +115,5 @@ if uploaded:
             st.caption("💡 İpucu: Sonuç yanlışsa 'PDF Ölçek Çarpanı' değerini değiştirerek kalibre edin.")
     else:
         st.error("Dosyada işlenebilir vektörel veri bulunamadı.")
+
 
