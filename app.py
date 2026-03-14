@@ -1,4 +1,7 @@
 import streamlit as st
+# Geçici test satırı (Giriş yapınca bunu sileceğiz)
+st.write(f"Sistem hazır mı?: {'credentials' in st.secrets}")
+import streamlit as st
 import ezdxf
 import matplotlib.pyplot as plt
 import tempfile
