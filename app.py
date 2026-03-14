@@ -13,7 +13,7 @@ if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
 if not st.session_state.logged_in:
-    st.title("🏗️ SaaS Metraj Giriş")
+    st.title("🏗️ Mimari Metraj Giriş")
     with st.form("login_form"):
         user = st.text_input("Kullanıcı Adı")
         pw = st.text_input("Şifre", type="password")
@@ -61,7 +61,7 @@ if st.sidebar.button("Çıkış Yap"):
     st.session_state.logged_in = False
     st.rerun()
 
-st.title("🏗️ DUVAR METRAJ VE PLAN ANALİZİ")
+st.title("🏗️ Mimari Duvar Metrajı")
 
 with st.sidebar:
     st.header("⚙️ Ayarlar")
