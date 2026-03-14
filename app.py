@@ -11,7 +11,6 @@ from inference_sdk import InferenceHTTPClient
 ROBO_API_KEY = "my238ZSyFyxbwEVQHISP"
 MODEL_ID = "mimari_duvar_tespiti-2/8"
 
-# Roboflow İstemcisi
 CLIENT = InferenceHTTPClient(
     api_url="https://detect.roboflow.com",
     api_key=ROBO_API_KEY
@@ -20,13 +19,11 @@ CLIENT = InferenceHTTPClient(
 # --- FONKSİYONLAR ---
 
 def read_dxf_geometry(path, target_layers):
-    """DXF dosyasından blokları patlatarak ve koordinat hatasız geometri okur."""
     try:
         doc = ezdxf.readfile(path)
         msp = doc.modelspace()
         polygons = []
 
-        # Blok içindeki objeleri de okumak için patlatma işlemi
         entities = list(msp.query('LINE LWPOLYLINE POLYLINE'))
         for insert in msp.query('INSERT'):
             try:
@@ -51,15 +48,6 @@ def read_dxf_geometry(path, target_layers):
         st.error(f"DXF Okuma Hatası: {e}")
         return []
 
-def run_roboflow_ai(file_path):
-    """Roboflow API kullanarak plandaki nesneleri tespit eder."""
-    try:
-        result = CLIENT.infer(file_path, model_id=MODEL_ID)
-        return result.get('predictions', [])
-    except Exception as e:
-        st.warning(f"AI Analizi şu an yapılamıyor: {e}")
-        return []
-
 def calculate_total_length(geometries):
     total = 0
     for geo in geometries:
@@ -67,99 +55,67 @@ def calculate_total_length(geometries):
             total += math.dist(geo[i], geo[i+1])
     return total
 
-# --- ARAYÜZ (STREAMLIT) ---
+# --- ARAYÜZ ---
 st.set_page_config(page_title="Elifim Metraj Pro", layout="wide", page_icon="🏗️")
 st.title("🏗️ DUVAR METRAJ PANELİ")
 
 with st.sidebar:
     st.header("⚙️ Analiz Ayarları")
-    uploaded = st.file_uploader("Dosya Seç (DXF, PDF veya Görsel)", type=["dxf", "pdf", "jpg", "png", "jpeg"])
-    
-    st.divider()
-    kat_yuk = st.number_input("Kat Yüksekliği (m)", value=3.0, step=0.1)
+    uploaded = st.file_uploader("Dosya Seç", type=["dxf", "pdf", "jpg", "png", "jpeg"])
+    kat_yuk = st.number_input("Kat Yüksekliği (m)", value=2.85, step=0.01) # image_15835f.jpg referansıyla güncellendi
     birim = st.selectbox("Çizim Birimi (DXF)", ["cm", "mm", "m"], index=0)
     katmanlar = st.text_input("DXF Katman Filtresi", "DUVAR, WALL, MIM_DUVAR")
-    
-    st.divider()
-    st.info("💡 Roboflow AI modülü aktiftir. Görsel analizlerde otomatik nesne tespiti yapar.")
 
 if uploaded:
-    # Dosyayı geçici olarak kaydet
-    suffix = f".{uploaded.name.split('.')[-1]}"
-    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+    with tempfile.NamedTemporaryFile(delete=False, suffix=f".{uploaded.name.split('.')[-1]}") as tmp:
         tmp.write(uploaded.getbuffer())
         file_path = tmp.name
 
     is_dxf = uploaded.name.lower().endswith(".dxf")
-    is_img = uploaded.name.lower().endswith((".jpg", ".png", ".jpeg"))
-
     geos = []
-    ai_preds = []
-    final_uzunluk = 0
-
-    # --- İŞLEME MANTIĞI ---
+    
     if is_dxf:
         target_layers = [x.strip() for x in katmanlar.split(",")] if katmanlar else []
         geos = read_dxf_geometry(file_path, target_layers)
         raw_len = calculate_total_length(geos)
         bolen = 100 if birim == "cm" else (1000 if birim == "mm" else 1)
-        # Mimari çift çizgi mantığı (Aks uzunluğu tahmini için /2)
         final_uzunluk = (raw_len / 2) / bolen
-    
-    if is_img:
-        st.info("Yapay Zeka nesne tespiti yapılıyor...")
-        ai_preds = run_roboflow_ai(file_path)
 
-    # --- GÖRSELLEŞTİRME VE SONUÇLAR ---
-    if geos or ai_preds:
+    if geos:
         c1, c2 = st.columns([2, 1])
 
         with c1:
             st.subheader("🔍 Plan Analiz Görünümü")
-            
-            # Matplotlib temizleme ve figür oluşturma
             plt.clf() 
             fig, ax = plt.subplots(figsize=(12, 10))
             
-            if geos:
-                # DXF Çizgilerini Çiz
-                for g in geos:
-                    xs, ys = zip(*g)
-                    ax.plot(xs, ys, color="#e67e22", linewidth=0.8)
-                
-                # Görüntü bozulmasını engelleyen kritik ayarlar
-                ax.set_aspect("equal", adjustable="datalim")
+            all_x, all_y = [], []
+            for g in geos:
+                xs, ys = zip(*g)
+                all_x.extend(xs)
+                all_y.extend(ys)
+                ax.plot(xs, ys, color="#e67e22", linewidth=1.2) # Çizgi kalınlığı biraz artırıldı
             
-            # Eğer resim yüklenmişse ve AI sonuçları varsa onları da çiz
-            if is_img:
-                img = cv2.imread(file_path)
-                img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-                ax.imshow(img)
-            
+            # --- AKILLI ODAKLANMA (ZOOM) ---
+            if all_x and all_y:
+                x_min, x_max = min(all_x), max(all_x)
+                y_min, y_max = min(all_y), max(all_y)
+                pad_x = (x_max - x_min) * 0.05
+                pad_y = (y_max - y_min) * 0.05
+                ax.set_xlim(x_min - pad_x, x_max + pad_x)
+                ax.set_ylim(y_min - pad_y, y_max + pad_y)
+
+            ax.set_aspect("equal", adjustable="box")
             ax.axis("off")
             plt.tight_layout()
             st.pyplot(fig)
-            plt.close(fig) # Belleği boşalt
+            plt.close(fig)
 
         with c2:
             st.subheader("📊 Metraj Sonuçları")
-            if is_dxf:
-                st.metric("📏 Toplam Uzunluk", f"{round(final_uzunluk, 2)} m")
-                st.metric("🧱 Duvar Alanı", f"{round(final_uzunluk * kat_yuk, 2)} m²")
-                
-                # Hedef karşılaştırma (58.08 m referansı)
-                sapma = final_uzunluk - 58.08
-                color = "normal" if abs(sapma) < 1 else "inverse"
-                st.metric("🎯 Referans Sapması", f"{round(sapma, 2)} m", delta_color=color)
+            st.metric("📏 Toplam Uzunluk", f"{round(final_uzunluk, 2)} m")
+            st.metric("🧱 Duvar Alanı", f"{round(final_uzunluk * kat_yuk, 2)} m²")
             
-            if ai_preds:
-                st.divider()
-                st.write("🤖 **AI Tespit Edilen Nesneler:**")
-                for p in ai_preds:
-                    st.write(f"✅ {p['class']} - Güven: %{round(p['confidence']*100, 1)}")
-
-    else:
-        st.error("Analiz edilecek veri bulunamadı. Lütfen katman ayarlarını kontrol edin.")
-
-else:
-    st.info("Lütfen sol panelden bir DXF veya Plan Görseli yükleyin.")
+            # Referans takibi (Görselinizdeki -1.84m sapma referansı)
+            sapma = final_uzunluk - 58.08
+            st.metric("🎯 Referans Sapması", f"{round(sapma, 2)} m", delta=f"{round(sapma, 2)} m", delta_color="inverse")
