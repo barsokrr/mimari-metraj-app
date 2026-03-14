@@ -10,3 +10,4 @@ scikit-learn
 PyYAML
 pdfplumber
 fpdf
+streamlit-authenticator==0.2.3
