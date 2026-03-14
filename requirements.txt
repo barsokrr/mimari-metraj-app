@@ -1,5 +1,5 @@
 streamlit
-streamlit-authenticator
+streamlit-authenticator==0.2.3
 opencv-python-headless
 numpy
 pandas
@@ -10,4 +10,3 @@ scikit-learn
 PyYAML
 pdfplumber
 fpdf
-streamlit-authenticator==0.2.3
