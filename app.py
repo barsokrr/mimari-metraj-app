@@ -8,7 +8,7 @@ import streamlit_authenticator as stauth
 from inference_sdk import InferenceHTTPClient
 
 # --- 1. KİMLİK DOĞRULAMA (AUTH) YAPILANDIRMASI ---
-# KeyError: 'name' hatasını aşmak için session_state manuel başlatılmalı
+# KeyError: 'name' hatasını önlemek için session_state manuel başlatılıyor
 if 'authentication_status' not in st.session_state:
     st.session_state['authentication_status'] = None
 if 'name' not in st.session_state:
@@ -17,7 +17,7 @@ if 'username' not in st.session_state:
     st.session_state['username'] = None
 
 try:
-    # Secrets verilerini sözlük olarak alıp kopyalıyoruz
+    # Secrets verilerini sözlük olarak alıp kopyalıyoruz (item assignment hatası için)
     config = st.secrets.to_dict()
     
     authenticator = stauth.Authenticate(
@@ -27,12 +27,13 @@ try:
         config['cookie']['expiry_days']
     )
 except Exception as e:
-    st.error(f"Kimlik doğrulama yapılandırma hatası: {e}")
+    st.error(f"Kimlik doğrulama yapılandırılamadı: {e}")
     st.stop()
 
 # Giriş Panelini Göster (v0.2.3 sürümü için doğru imza)
 name, authentication_status, username = authenticator.login('Giriş Yap', 'main')
 
+# Giriş Başarılı ise Uygulamayı Göster
 if st.session_state["authentication_status"]:
     # --- 2. GÜVENLİ API VE SIDEBAR ---
     authenticator.logout('Çıkış Yap', 'sidebar')
@@ -103,7 +104,7 @@ if st.session_state["authentication_status"]:
             geos = read_dxf_geometry(file_path, target_layers)
             if geos:
                 raw_len = calculate_total_length(geos)
-                # Birim dönüşümü ve mimari çift çizgi düzeltmesi
+                # Çizim birimi ve mimari çift çizgi düzeltmesi
                 bolen = 100 if birim == "cm" else (1000 if birim == "mm" else 1)
                 final_uzunluk = (raw_len / 2) / bolen
 
@@ -118,6 +119,7 @@ if st.session_state["authentication_status"]:
                     all_x.extend(xs); all_y.extend(ys)
                     ax.plot(xs, ys, color="#e67e22", linewidth=0.8)
 
+                # Auto-zoom ayarları
                 if all_x and all_y:
                     x_min, x_max = np.percentile(all_x, [1, 99])
                     y_min, y_max = np.percentile(all_y, [1, 99])
@@ -138,8 +140,10 @@ if st.session_state["authentication_status"]:
                 referans_deger = 58.08
                 sapma = final_uzunluk - referans_deger
                 st.metric("🎯 Referans Sapması", f"{round(sapma, 2)} m", delta=f"{round(sapma, 2)} m", delta_color="inverse")
+                
+                st.info(f"Hesaplama {birim} birimi üzerinden yapılmıştır.")
         else:
-            st.warning("⚠️ Çizim bulunamadı.")
+            st.warning("⚠️ Çizim bulunamadı. Katman filtrelerini kontrol edin.")
     else:
         st.info("👋 Başlamak için bir plan dosyası yükleyin.")
 
