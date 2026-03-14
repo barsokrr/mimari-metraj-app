@@ -62,7 +62,7 @@ def calculate_total_length(geometries):
     return total
 
 # --- ARAYÜZ (STREAMLIT) ---
-st.set_page_config(page_title="Elifim Metraj Pro", layout="wide", page_icon="🏗️")
+st.set_page_config(page_title="İnşaat Metraj Hesabı", layout="wide", page_icon="🏗️")
 st.title("🏗️ DUVAR METRAJ PANELİ")
 
 # Sidebar Ayarları
@@ -156,3 +156,4 @@ if uploaded:
 else:
     # Dosya yüklenmediğinde karşılama ekranı
     st.info("👋 Başlamak için lütfen sol taraftan bir DXF plan dosyası yükleyin.")
+
