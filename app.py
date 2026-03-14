@@ -7,17 +7,15 @@ import math
 import numpy as np
 from inference_sdk import InferenceHTTPClient
 
-# --- 1. OTURUM HATALARI ÖNLEME (KeyError: 'name' FIX) ---
-# Tarayıcıda hatalı çerez kalsa bile uygulamanın çökmesini engeller.
+# --- 1. OTURUM HATALARI ÖNLEME ---
+# Uygulama başladığında state'lerin tanımlı olduğundan emin oluyoruz.
 for key in ['authentication_status', 'name', 'username']:
     if key not in st.session_state:
         st.session_state[key] = None
 
 # --- 2. KİMLİK DOĞRULAMA YAPILANDIRMASI ---
 try:
-    # Secrets objesi doğrudan değiştirilemez, bu yüzden kopya alıyoruz.
     config = st.secrets.to_dict()
-    
     authenticator = stauth.Authenticate(
         config['credentials'],
         config['cookie']['name'],
@@ -25,28 +23,26 @@ try:
         config['cookie']['expiry_days']
     )
 except Exception as e:
-    st.error(f"Kimlik doğrulama yapılandırma hatası: {e}")
+    st.error(f"Yapılandırma hatası: {e}")
     st.stop()
 
-# --- 3. LOGIN PANELİ (Hataları Yakalayan Yapı) ---
+# --- 3. LOGIN PANELİ (Hataları Yakalayan ve Boşaltan Yapı) ---
+# Buradaki try-except bloğu, image_09415a.jpg'deki 'name' hatasını bertaraf eder.
 try:
-    # v0.2.3 sürümü için doğru dönüş değerleri ve hata kontrolü.
     name, authentication_status, username = authenticator.login('Giriş Yap', 'main')
-except KeyError:
-    # Bozuk çerez varsa burası yakalar, state'i sıfırlar ve uygulamanın donmasını engeller.
+except Exception:
+    # Eğer çerez bozuksa, state'i temizleyip login ekranını manuel basıyoruz.
     st.session_state['authentication_status'] = None
     st.session_state['name'] = None
     st.session_state['username'] = None
-    st.warning("Oturum süresi dolmuş veya tarayıcı çerezi hatalı. Lütfen sayfayı yenileyip tekrar deneyin.")
     name, authentication_status, username = None, None, None
 
 # --- 4. UYGULAMA ANA GÖVDESİ ---
 if st.session_state["authentication_status"]:
-    # Giriş başarılıysa çıkış butonunu yan menüye ekle.
     authenticator.logout('Çıkış Yap', 'sidebar')
     
-    # API Anahtarı Kontrolü
-    ROBO_API_KEY = st.secrets.get("ROBOFLOW_API_KEY", "Anahtar_Bulunamadi")
+    # API Ayarları
+    ROBO_API_KEY = st.secrets.get("ROBO_API_KEY", "Anahtar_Bulunamadi")
     MODEL_ID = "mimari_duvar_tespiti-2/8"
     CLIENT = InferenceHTTPClient(api_url="https://detect.roboflow.com", api_key=ROBO_API_KEY)
 
@@ -57,7 +53,6 @@ if st.session_state["authentication_status"]:
             msp = doc.modelspace()
             polygons = []
             entities = list(msp.query('LINE LWPOLYLINE POLYLINE'))
-            
             for e in entities:
                 layer_name = e.dxf.layer.upper()
                 is_target = any(t.upper() in layer_name for t in target_layers) if target_layers else True
@@ -79,16 +74,16 @@ if st.session_state["authentication_status"]:
                 total += math.dist(geo[i], geo[i+1])
         return total
 
-    # --- 6. ARAYÜZ TASARIMI ---
+    # --- 6. ARAYÜZ ---
     st.title("🏗️ DUVAR METRAJ PANELİ")
     st.sidebar.success(f"Hoş geldin, {st.session_state['name']}")
 
     with st.sidebar:
-        st.header("⚙️ Analiz Ayarları")
+        st.header("⚙️ Ayarlar")
         uploaded = st.file_uploader("Dosya Seç (DXF)", type=["dxf"])
         kat_yuk = st.number_input("Kat Yüksekliği (m)", value=2.85, step=0.01)
         birim = st.selectbox("Çizim Birimi", ["cm", "mm", "m"], index=0)
-        katmanlar = st.text_input("Katman Filtresi", "DUVAR, WALL, MIM_DUVAR")
+        katmanlar = st.text_input("Katman Filtresi", "DUVAR, WALL")
 
     if uploaded:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".dxf") as tmp:
@@ -101,12 +96,11 @@ if st.session_state["authentication_status"]:
         if geos:
             raw_len = calculate_total_length(geos)
             bolen = 100 if birim == "cm" else (1000 if birim == "mm" else 1)
-            # Mimari çift çizgi metraj düzeltmesi (/2)
-            final_uzunluk = (raw_len / 2) / bolen
+            final_uzunluk = (raw_len / 2) / bolen # Mimari çift çizgi düzeltmesi
 
             c1, c2 = st.columns([2, 1])
             with c1:
-                st.subheader("🔍 Plan Analiz Görünümü")
+                st.subheader("🔍 Plan Görünümü")
                 fig, ax = plt.subplots(figsize=(8, 6))
                 for g in geos:
                     xs, ys = zip(*g)
@@ -117,18 +111,16 @@ if st.session_state["authentication_status"]:
                 plt.close(fig)
             
             with c2:
-                st.subheader("📊 Metraj Sonuçları")
+                st.subheader("📊 Sonuçlar")
                 st.metric("📏 Toplam Uzunluk", f"{round(final_uzunluk, 2)} m")
                 st.metric("🧱 Duvar Alanı", f"{round(final_uzunluk * kat_yuk, 2)} m²")
-                st.info("💡 Uzunluk, mimari çift çizgi projeye göre otomatik olarak 2'ye bölünmüştür.")
         else:
-            st.warning("⚠️ Seçilen katmanlarda çizim verisi bulunamadı. Lütfen katman adlarını kontrol edin.")
+            st.warning("⚠️ Çizim verisi bulunamadı.")
     else:
-        st.info("👋 Başlamak için bir DXF dosyası yükleyin.")
+        st.info("👋 Başlamak için DXF dosyası yükleyin.")
 
 # --- 7. GİRİŞ DURUMU KONTROLLERİ ---
 elif st.session_state["authentication_status"] is False:
     st.error('❌ Kullanıcı adı veya şifre hatalı')
 elif st.session_state["authentication_status"] is None:
-    # Başlangıçta veya çerez temizlendiğinde bu uyarı görünür.
     st.warning('🔐 Lütfen kullanıcı adı ve şifrenizi giriniz')
