@@ -68,7 +68,7 @@ def calculate_total_length(geometries):
 
 # --- ARAYÜZ (STREAMLIT) ---
 st.set_page_config(page_title="Elifim Metraj Pro", layout="wide", page_icon="🏗️")
-st.title("🏗️ ELİFİM İÇİN AKILLI DUVAR METRAJI")
+st.title("🏗️ Duvar metraj paneli")
 
 with st.sidebar:
     st.header("⚙️ Analiz Ayarları")
@@ -150,3 +150,4 @@ if uploaded:
 
 else:
     st.info("Başlamak için sol taraftan bir dosya yükleyin.")
+
