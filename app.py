@@ -8,22 +8,7 @@ import streamlit_authenticator as stauth
 from inference_sdk import InferenceHTTPClient
 
 # --- 1. KİMLİK DOĞRULAMA (AUTH) YAPILANDIRMASI ---
-# KeyError: 'name' hatasını önlemek için verileri kopyalayarak işliyoruz
-try:
-    # Secrets verilerini doğrudan değiştirmek yerine bir kopyasını alıyoruz
-    auth_data = st.secrets.to_dict()
-    
-    authenticator = stauth.Authenticate(
-        auth_data['credentials'],
-        auth_data['cookie']['name'],
-        auth_data['cookie']['key'],
-        auth_data['cookie']['expiry_days']
-    )
-except Exception as e:
-    st.error(f"Kimlik doğrulama ayarları yüklenemedi: {e}")
-    st.stop()
-
-# Çerez hatasını önlemek için session_state başlatma
+# KeyError: 'name' hatasını aşmak için session_state manuel başlatılmalı
 if 'authentication_status' not in st.session_state:
     st.session_state['authentication_status'] = None
 if 'name' not in st.session_state:
@@ -31,8 +16,21 @@ if 'name' not in st.session_state:
 if 'username' not in st.session_state:
     st.session_state['username'] = None
 
-# Giriş Panelini Göster
-# Sürüm 0.2.3 için doğru login imzası
+try:
+    # Secrets verilerini sözlük olarak alıp kopyalıyoruz
+    config = st.secrets.to_dict()
+    
+    authenticator = stauth.Authenticate(
+        config['credentials'],
+        config['cookie']['name'],
+        config['cookie']['key'],
+        config['cookie']['expiry_days']
+    )
+except Exception as e:
+    st.error(f"Kimlik doğrulama yapılandırma hatası: {e}")
+    st.stop()
+
+# Giriş Panelini Göster (v0.2.3 sürümü için doğru imza)
 name, authentication_status, username = authenticator.login('Giriş Yap', 'main')
 
 if st.session_state["authentication_status"]:
@@ -45,7 +43,7 @@ if st.session_state["authentication_status"]:
         st.error("Hata: Secrets içinde 'ROBOFLOW_API_KEY' bulunamadı!")
         st.stop()
 
-    MODEL_ID = "mimari_duvar_tespiti-2/8" #
+    MODEL_ID = "mimari_duvar_tespiti-2/8"
     CLIENT = InferenceHTTPClient(api_url="https://detect.roboflow.com", api_key=ROBO_API_KEY)
 
     # --- 3. ANALİZ FONKSİYONLARI ---
@@ -105,6 +103,7 @@ if st.session_state["authentication_status"]:
             geos = read_dxf_geometry(file_path, target_layers)
             if geos:
                 raw_len = calculate_total_length(geos)
+                # Birim dönüşümü ve mimari çift çizgi düzeltmesi
                 bolen = 100 if birim == "cm" else (1000 if birim == "mm" else 1)
                 final_uzunluk = (raw_len / 2) / bolen
 
@@ -119,7 +118,6 @@ if st.session_state["authentication_status"]:
                     all_x.extend(xs); all_y.extend(ys)
                     ax.plot(xs, ys, color="#e67e22", linewidth=0.8)
 
-                # AKILLI ODAKLANMA (AUTO-ZOOM)
                 if all_x and all_y:
                     x_min, x_max = np.percentile(all_x, [1, 99])
                     y_min, y_max = np.percentile(all_y, [1, 99])
@@ -147,5 +145,5 @@ if st.session_state["authentication_status"]:
 
 elif st.session_state["authentication_status"] is False:
     st.error('Kullanıcı adı veya şifre hatalı')
-elif st.session_status["authentication_status"] is None:
+elif st.session_state["authentication_status"] is None:
     st.warning('Lütfen kullanıcı adı ve şifrenizi giriniz')
