@@ -7,8 +7,8 @@ import numpy as np
 import streamlit_authenticator as stauth
 from inference_sdk import InferenceHTTPClient
 
-# --- 1. OTURUM DURUMU ÖN HAZIRLIĞI (KeyError: 'name' FIX) ---
-# Kütüphane çerezleri kontrol etmeden önce bu alanları zorla tanımlıyoruz.
+# --- 1. OTURUM HATALARI ÖNLEME (KeyError: 'name' FIX) ---
+# Kütüphane çerezleri kontrol etmeden önce state'leri zorla tanımlıyoruz.
 if 'authentication_status' not in st.session_state:
     st.session_state['authentication_status'] = None
 if 'name' not in st.session_state:
@@ -18,11 +18,10 @@ if 'username' not in st.session_state:
 
 # --- 2. KİMLİK DOĞRULAMA YAPILANDIRMASI ---
 try:
-    # 'Secrets does not support item assignment' hatasını önlemek için 
-    # to_dict() ile veriyi kopyalıyoruz.
+    # 'Secrets does not support item assignment' hatası için to_dict() kullanımı.
+    # Görseldeki (image_13b2de.png) verileri baz alır.
     config = st.secrets.to_dict()
     
-    # Secrets dosyanızdaki (image_13b2de.png) yapılandırmayı kullanıyoruz.
     authenticator = stauth.Authenticate(
         config['credentials'],
         config['cookie']['name'],
@@ -30,29 +29,28 @@ try:
         config['cookie']['expiry_days']
     )
 except Exception as e:
-    st.error(f"Sistem yapılandırma hatası: {e}")
+    st.error(f"Sistem yapılandırılamadı: {e}")
     st.stop()
 
-# --- 3. GİRİŞ PANELİ (v0.2.3 Hatasız Kullanım) ---
-# Görseldeki (image_139ba0.png) hatayı önlemek için login işlemini try-except içine alıyoruz.
+# --- 3. LOGIN İŞLEMİ (v0.2.3 Hatasız Kullanım) ---
+# Tarayıcıda bozuk çerez kalmışsa uygulamayı çökertmemesi için try-except eklendi.
 try:
-    # v0.2.3 sürümünde login() bu üç değeri döndürür.
+    # v0.2.3 sürümünde login bu 3 değeri döner.
     name, authentication_status, username = authenticator.login('Giriş Yap', 'main')
 except KeyError:
-    # Eğer tarayıcıda bozuk bir çerez varsa, state'i temizleyip kullanıcıyı uyarır.
     st.session_state['authentication_status'] = None
-    st.warning("Oturum süresi dolmuş veya hatalı çerez saptandı, lütfen tekrar giriş yapın.")
+    st.warning("Oturum süresi dolmuş, lütfen tekrar giriş yapın.") #
     name, authentication_status, username = None, None, None
 
-# --- 4. UYGULAMA ANA MANTIĞI ---
+# --- 4. UYGULAMA ANA GÖVDESİ ---
 if st.session_state["authentication_status"]:
     authenticator.logout('Çıkış Yap', 'sidebar')
     
-    # API Anahtarı kontrolü (image_092b8b.png).
+    # Roboflow API anahtarı kontrolü.
     try:
-        ROBO_API_KEY = st.secrets["ROBOFLOW_API_KEY"]
+        ROBO_API_KEY = st.secrets["ROBO_API_KEY"] #
     except KeyError:
-        st.error("Hata: Secrets içinde 'ROBOFLOW_API_KEY' bulunamadı!")
+        st.error("Secrets içinde 'ROBO_API_KEY' bulunamadı!")
         st.stop()
 
     MODEL_ID = "mimari_duvar_tespiti-2/8"
@@ -65,11 +63,9 @@ if st.session_state["authentication_status"]:
             msp = doc.modelspace()
             polygons = []
             entities = list(msp.query('LINE LWPOLYLINE POLYLINE'))
-            
             for insert in msp.query('INSERT'):
                 try: entities.extend(insert.explode())
                 except: continue
-                
             for e in entities:
                 layer_name = e.dxf.layer.upper()
                 is_target_layer = any(t.upper() in layer_name for t in target_layers) if target_layers else True
@@ -94,69 +90,50 @@ if st.session_state["authentication_status"]:
 
     # --- 6. ARAYÜZ TASARIMI ---
     st.title("🏗️ DUVAR METRAJ PANELİ")
-    st.sidebar.success(f"Hoş geldin, {st.session_state.get('name', 'Kullanıcı')}")
+    st.sidebar.success(f"Hoş geldin, {st.session_state.get('name', 'Admin')}")
 
     with st.sidebar:
         st.header("⚙️ Analiz Ayarları")
-        uploaded = st.file_uploader("Dosya Seç (DXF veya Görsel)", type=["dxf", "jpg", "png", "jpeg"])
+        uploaded = st.file_uploader("Dosya Seç (DXF)", type=["dxf"])
         kat_yuk = st.number_input("Kat Yüksekliği (m)", value=2.85, step=0.01)
-        birim = st.selectbox("Çizim Birimi (DXF)", ["cm", "mm", "m"], index=0)
-        katmanlar = st.text_input("DXF Katman Filtresi", "DUVAR, WALL, MIM_DUVAR")
+        birim = st.selectbox("Çizim Birimi", ["cm", "mm", "m"], index=0)
+        katmanlar = st.text_input("DXF Katman Filtresi", "DUVAR, WALL")
 
     if uploaded:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=f".{uploaded.name.split('.')[-1]}") as tmp:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".dxf") as tmp:
             tmp.write(uploaded.getbuffer())
             file_path = tmp.name
 
-        is_dxf = uploaded.name.lower().endswith(".dxf")
-        geos = []
-        final_uzunluk = 0
-
-        if is_dxf:
-            target_layers = [x.strip() for x in katmanlar.split(",")] if katmanlar else []
-            geos = read_dxf_geometry(file_path, target_layers)
-            if geos:
-                raw_len = calculate_total_length(geos)
-                # Birim dönüşümü ve mimari çift çizgi düzeltmesi
-                bolen = 100 if birim == "cm" else (1000 if birim == "mm" else 1)
-                final_uzunluk = (raw_len / 2) / bolen
-
+        target_layers = [x.strip() for x in katmanlar.split(",")] if katmanlar else []
+        geos = read_dxf_geometry(file_path, target_layers)
+        
         if geos:
+            raw_len = calculate_total_length(geos)
+            bolen = 100 if birim == "cm" else (1000 if birim == "mm" else 1)
+            # Mimari çizimlerde çift çizgi olduğu için 2'ye bölüyoruz
+            final_uzunluk = (raw_len / 2) / bolen
+
             c1, c2 = st.columns([2, 1])
             with c1:
-                st.subheader("🔍 Plan Analiz Görünümü")
+                st.subheader("🔍 Plan Analizi")
                 fig, ax = plt.subplots(figsize=(10, 8))
-                all_x, all_y = [], []
                 for g in geos:
                     xs, ys = zip(*g)
-                    all_x.extend(xs); all_y.extend(ys)
                     ax.plot(xs, ys, color="#e67e22", linewidth=0.8)
-
-                if all_x and all_y:
-                    x_min, x_max = np.percentile(all_x, [1, 99])
-                    y_min, y_max = np.percentile(all_y, [1, 99])
-                    ax.set_xlim(x_min, x_max)
-                    ax.set_ylim(y_min, y_max)
-
                 ax.set_aspect("equal")
                 ax.axis("off")
                 st.pyplot(fig)
-                plt.close(fig)
-
+            
             with c2:
-                st.subheader("📊 Metraj Sonuçları")
+                st.subheader("📊 Sonuçlar")
                 st.metric("📏 Toplam Uzunluk", f"{round(final_uzunluk, 2)} m")
                 st.metric("🧱 Duvar Alanı", f"{round(final_uzunluk * kat_yuk, 2)} m²")
-                
-                referans_deger = 58.08
-                sapma = final_uzunluk - referans_deger
-                st.metric("🎯 Referans Sapması", f"{round(sapma, 2)} m", delta=f"{round(sapma, 2)} m", delta_color="inverse")
         else:
             st.warning("⚠️ Belirtilen katmanlarda çizim bulunamadı.")
     else:
-        st.info("👋 Başlamak için lütfen bir DXF plan dosyası yükleyin.")
+        st.info("👋 Başlamak için bir DXF dosyası yükleyin.")
 
 elif st.session_state["authentication_status"] is False:
     st.error('Kullanıcı adı veya şifre hatalı')
 elif st.session_state["authentication_status"] is None:
-    st.warning('Lütfen kullanıcı adı ve şifrenizi giriniz')
+    st.warning('Lütfen kullanıcı adı ve şifrenizi giriniz') #
