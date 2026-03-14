@@ -7,8 +7,8 @@ import math
 import numpy as np
 from inference_sdk import InferenceHTTPClient
 
-# --- 1. OTURUM HATALARI ÖNLEME ---
-# Uygulama başladığında state'lerin tanımlı olduğundan emin oluyoruz.
+# --- 1. OTURUM HATALARI ÖNLEME (KeyError: 'name' FIX) ---
+# Çerez kontrolü sırasında uygulamanın çökmesini engeller.
 for key in ['authentication_status', 'name', 'username']:
     if key not in st.session_state:
         st.session_state[key] = None
@@ -26,12 +26,12 @@ except Exception as e:
     st.error(f"Yapılandırma hatası: {e}")
     st.stop()
 
-# --- 3. LOGIN PANELİ (Hataları Yakalayan ve Boşaltan Yapı) ---
-# Buradaki try-except bloğu, image_09415a.jpg'deki 'name' hatasını bertaraf eder.
+# --- 3. LOGIN PANELİ (Hataları Yakalayan Yapı) ---
+# image_08d0fa.jpg'deki 'name' hatasını bertaraf eden kritik bölüm.
 try:
     name, authentication_status, username = authenticator.login('Giriş Yap', 'main')
 except Exception:
-    # Eğer çerez bozuksa, state'i temizleyip login ekranını manuel basıyoruz.
+    # Bozuk çerez varsa state'i temizleyip login ekranını zorla getirir.
     st.session_state['authentication_status'] = None
     st.session_state['name'] = None
     st.session_state['username'] = None
@@ -81,9 +81,9 @@ if st.session_state["authentication_status"]:
     with st.sidebar:
         st.header("⚙️ Ayarlar")
         uploaded = st.file_uploader("Dosya Seç (DXF)", type=["dxf"])
-        kat_yuk = st.number_input("Kat Yüksekliği (m)", value=2.85, step=0.01)
-        birim = st.selectbox("Çizim Birimi", ["cm", "mm", "m"], index=0)
-        katmanlar = st.text_input("Katman Filtresi", "DUVAR, WALL")
+        kat_yuk = st.number_input("Kat Yüksekliği (m)", value=2.85)
+        birim = st.selectbox("Çizim Birimi", ["cm", "mm", "m"])
+        katmanlar = st.text_input("Katman Filtresi", "DUVAR")
 
     if uploaded:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".dxf") as tmp:
@@ -104,7 +104,7 @@ if st.session_state["authentication_status"]:
                 fig, ax = plt.subplots(figsize=(8, 6))
                 for g in geos:
                     xs, ys = zip(*g)
-                    ax.plot(xs, ys, color="#e67e22", linewidth=0.8)
+                    ax.plot(xs, ys, color="#e67e22")
                 ax.set_aspect("equal")
                 ax.axis("off")
                 st.pyplot(fig)
@@ -112,14 +112,11 @@ if st.session_state["authentication_status"]:
             
             with c2:
                 st.subheader("📊 Sonuçlar")
-                st.metric("📏 Toplam Uzunluk", f"{round(final_uzunluk, 2)} m")
-                st.metric("🧱 Duvar Alanı", f"{round(final_uzunluk * kat_yuk, 2)} m²")
+                st.metric("📏 Uzunluk", f"{round(final_uzunluk, 2)} m")
+                st.metric("🧱 Alan", f"{round(final_uzunluk * kat_yuk, 2)} m²")
         else:
             st.warning("⚠️ Çizim verisi bulunamadı.")
-    else:
-        st.info("👋 Başlamak için DXF dosyası yükleyin.")
 
-# --- 7. GİRİŞ DURUMU KONTROLLERİ ---
 elif st.session_state["authentication_status"] is False:
     st.error('❌ Kullanıcı adı veya şifre hatalı')
 elif st.session_state["authentication_status"] is None:
