@@ -7,8 +7,8 @@ import numpy as np
 import streamlit_authenticator as stauth
 from inference_sdk import InferenceHTTPClient
 
-# --- 1. KİMLİK DOĞRULAMA (AUTH) YAPILANDIRMASI ---
-# KeyError: 'name' hatasını önlemek için session_state manuel başlatılıyor
+# --- 1. OTURUM DURUMU BAŞLATMA (KeyError: 'name' Çözümü) ---
+# Kütüphane çerezi kontrol etmeden önce bu alanları tanımlıyoruz
 if 'authentication_status' not in st.session_state:
     st.session_state['authentication_status'] = None
 if 'name' not in st.session_state:
@@ -16,8 +16,9 @@ if 'name' not in st.session_state:
 if 'username' not in st.session_state:
     st.session_state['username'] = None
 
+# --- 2. KİMLİK DOĞRULAMA YAPILANDIRMASI ---
 try:
-    # Secrets verilerini sözlük olarak alıp kopyalıyoruz (item assignment hatası için)
+    # Secrets verilerini doğrudan değiştirmek yerine sözlük kopyasını alıyoruz
     config = st.secrets.to_dict()
     
     authenticator = stauth.Authenticate(
@@ -30,12 +31,12 @@ except Exception as e:
     st.error(f"Kimlik doğrulama yapılandırılamadı: {e}")
     st.stop()
 
-# Giriş Panelini Göster (v0.2.3 sürümü için doğru imza)
+# Giriş Panelini Göster (v0.2.3 sürümü için doğru kullanım)
 name, authentication_status, username = authenticator.login('Giriş Yap', 'main')
 
-# Giriş Başarılı ise Uygulamayı Göster
+# Giriş Durumu Kontrolü
 if st.session_state["authentication_status"]:
-    # --- 2. GÜVENLİ API VE SIDEBAR ---
+    # --- 3. GÜVENLİ API VE SIDEBAR ---
     authenticator.logout('Çıkış Yap', 'sidebar')
     
     try:
@@ -47,7 +48,7 @@ if st.session_state["authentication_status"]:
     MODEL_ID = "mimari_duvar_tespiti-2/8"
     CLIENT = InferenceHTTPClient(api_url="https://detect.roboflow.com", api_key=ROBO_API_KEY)
 
-    # --- 3. ANALİZ FONKSİYONLARI ---
+    # --- 4. DXF ANALİZ FONKSİYONLARI ---
     def read_dxf_geometry(path, target_layers):
         try:
             doc = ezdxf.readfile(path)
@@ -79,7 +80,7 @@ if st.session_state["authentication_status"]:
                 total += math.dist(geo[i], geo[i+1])
         return total
 
-    # --- 4. ARAYÜZ TASARIMI ---
+    # --- 5. ARAYÜZ TASARIMI ---
     st.title("🏗️ DUVAR METRAJ PANELİ")
     st.sidebar.success(f"Hoş geldin, {st.session_state['name']}")
 
@@ -104,7 +105,7 @@ if st.session_state["authentication_status"]:
             geos = read_dxf_geometry(file_path, target_layers)
             if geos:
                 raw_len = calculate_total_length(geos)
-                # Çizim birimi ve mimari çift çizgi düzeltmesi
+                # Birim dönüşümü ve mimari çift çizgi düzeltmesi
                 bolen = 100 if birim == "cm" else (1000 if birim == "mm" else 1)
                 final_uzunluk = (raw_len / 2) / bolen
 
@@ -119,7 +120,6 @@ if st.session_state["authentication_status"]:
                     all_x.extend(xs); all_y.extend(ys)
                     ax.plot(xs, ys, color="#e67e22", linewidth=0.8)
 
-                # Auto-zoom ayarları
                 if all_x and all_y:
                     x_min, x_max = np.percentile(all_x, [1, 99])
                     y_min, y_max = np.percentile(all_y, [1, 99])
@@ -143,9 +143,9 @@ if st.session_state["authentication_status"]:
                 
                 st.info(f"Hesaplama {birim} birimi üzerinden yapılmıştır.")
         else:
-            st.warning("⚠️ Çizim bulunamadı. Katman filtrelerini kontrol edin.")
+            st.warning("⚠️ Belirtilen katmanlarda çizim bulunamadı.")
     else:
-        st.info("👋 Başlamak için bir plan dosyası yükleyin.")
+        st.info("👋 Başlamak için lütfen bir DXF plan dosyası yükleyin.")
 
 elif st.session_state["authentication_status"] is False:
     st.error('Kullanıcı adı veya şifre hatalı')
