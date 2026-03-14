@@ -9,12 +9,12 @@ import streamlit_authenticator as stauth
 from inference_sdk import InferenceHTTPClient
 
 # --- 1. KİMLİK DOĞRULAMA (AUTH) YAPILANDIRMASI ---
-# Secrets içindeki verileri çekiyoruz
+# Secrets'tan verileri hata almadan çekmek için kopyasını oluşturuyoruz
 try:
-    credentials = st.secrets["credentials"]
-    cookie = st.secrets["cookie"]
+    # TOML verisini doğrudan kullanmak yerine kopyasını alarak hata riskini sıfırlıyoruz
+    credentials = dict(st.secrets["credentials"])
+    cookie = dict(st.secrets["cookie"])
     
-    # Authenticator nesnesini oluştur
     authenticator = stauth.Authenticate(
         credentials,
         cookie['name'],
@@ -28,15 +28,12 @@ except Exception as e:
 # Giriş Panelini Göster
 name, authentication_status, username = authenticator.login('Giriş Yap', 'main')
 
-# --- 2. UYGULAMA MANTIĞI (Giriş Başarılıysa) ---
 if authentication_status:
-    # Sidebar ayarları ve Çıkış butonu
+    # --- 2. GÜVENLİ API VE ARAYÜZ AYARLARI ---
     authenticator.logout('Çıkış Yap', 'sidebar')
-    st.sidebar.title(f"Hoş geldin, {name}")
     
-    # --- GÜVENLİ API ERİŞİMİ ---
     try:
-        ROBO_API_KEY = st.secrets["ROBOFLOW_API_KEY"]
+        ROBO_API_KEY = st.secrets["ROBOFLOW_API_KEY"] #
     except KeyError:
         st.error("Hata: Secrets içinde 'ROBOFLOW_API_KEY' bulunamadı!")
         st.stop()
@@ -44,18 +41,16 @@ if authentication_status:
     MODEL_ID = "mimari_duvar_tespiti-2/8" #
     CLIENT = InferenceHTTPClient(api_url="https://detect.roboflow.com", api_key=ROBO_API_KEY)
 
-    # --- FONKSİYONLAR ---
+    # --- 3. FONKSİYONLAR ---
     def read_dxf_geometry(path, target_layers):
         try:
             doc = ezdxf.readfile(path)
             msp = doc.modelspace()
             polygons = []
             entities = list(msp.query('LINE LWPOLYLINE POLYLINE'))
-            
             for insert in msp.query('INSERT'):
                 try: entities.extend(insert.explode())
                 except: continue
-
             for e in entities:
                 layer_name = e.dxf.layer.upper()
                 is_target_layer = any(t.upper() in layer_name for t in target_layers) if target_layers else True
@@ -78,7 +73,7 @@ if authentication_status:
                 total += math.dist(geo[i], geo[i+1])
         return total
 
-    # --- ARAYÜZ TASARIMI ---
+    # --- 4. ARAYÜZ TASARIMI ---
     st.title("🏗️ DUVAR METRAJ PANELİ")
 
     with st.sidebar:
@@ -100,17 +95,15 @@ if authentication_status:
         if is_dxf:
             target_layers = [x.strip() for x in katmanlar.split(",")] if katmanlar else []
             geos = read_dxf_geometry(file_path, target_layers)
-            
             if geos:
                 raw_len = calculate_total_length(geos)
                 bolen = 100 if birim == "cm" else (1000 if birim == "mm" else 1)
-                final_uzunluk = (raw_len / 2) / bolen #
+                final_uzunluk = (raw_len / 2) / bolen # Çift çizgi düzeltmesi
 
         if geos:
             c1, c2 = st.columns([2, 1])
             with c1:
                 st.subheader("🔍 Plan Analiz Görünümü")
-                plt.clf()
                 fig, ax = plt.subplots(figsize=(12, 10))
                 all_x, all_y = [], []
                 for g in geos:
@@ -118,7 +111,7 @@ if authentication_status:
                     all_x.extend(xs); all_y.extend(ys)
                     ax.plot(xs, ys, color="#e67e22", linewidth=0.8)
 
-                # --- AKILLI ODAKLANMA (AUTO-ZOOM) ---
+                # AKILLI ODAKLANMA (AUTO-ZOOM)
                 if all_x and all_y:
                     x_min, x_max = np.percentile(all_x, [1, 99])
                     y_min, y_max = np.percentile(all_y, [1, 99])
@@ -126,22 +119,22 @@ if authentication_status:
                     ax.set_xlim(x_min - pad_x, x_max + pad_x)
                     ax.set_ylim(y_min - pad_y, y_max + pad_y)
 
-                ax.set_aspect("equal", adjustable="box")
+                ax.set_aspect("equal")
                 ax.axis("off")
                 st.pyplot(fig)
                 plt.close(fig)
 
             with c2:
                 st.subheader("📊 Metraj Sonuçları")
-                st.metric("📏 Toplam Uzunluk", f"{round(final_uzunluk, 2)} m")
+                st.metric("📏 Toplam Uzunluk", f"{round(final_uzunluk, 2)} m") #
                 st.metric("🧱 Duvar Alanı", f"{round(final_uzunluk * kat_yuk, 2)} m²")
                 
+                # Referans Karşılaştırma
                 referans_deger = 58.08
                 sapma = final_uzunluk - referans_deger
                 st.metric("🎯 Referans Sapması", f"{round(sapma, 2)} m", delta=f"{round(sapma, 2)} m", delta_color="inverse")
-                st.info(f"ℹ️ Hesaplama {birim} üzerinden yapılmıştır.")
         else:
-            st.warning("⚠️ Belirtilen katmanlarda çizim bulunamadı.")
+            st.warning("⚠️ Çizim bulunamadı.")
     else:
         st.info("👋 Başlamak için bir plan dosyası yükleyin.")
 
