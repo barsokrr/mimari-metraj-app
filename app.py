@@ -8,27 +8,35 @@ import streamlit_authenticator as stauth
 from inference_sdk import InferenceHTTPClient
 
 # --- 1. KİMLİK DOĞRULAMA (AUTH) YAPILANDIRMASI ---
-# streamlit-authenticator==0.2.3 sürümü için tam uyumlu yapı
+# KeyError: 'name' hatasını önlemek için verileri kopyalayarak işliyoruz
 try:
-    # Secrets içindeki verileri dict olarak alıyoruz
-    config = st.secrets.to_dict()
+    # Secrets verilerini doğrudan değiştirmek yerine bir kopyasını alıyoruz
+    auth_data = st.secrets.to_dict()
     
     authenticator = stauth.Authenticate(
-        config['credentials'],
-        config['cookie']['name'],
-        config['cookie']['key'],
-        config['cookie']['expiry_days']
+        auth_data['credentials'],
+        auth_data['cookie']['name'],
+        auth_data['cookie']['key'],
+        auth_data['cookie']['expiry_days']
     )
 except Exception as e:
-    st.error(f"Kimlik doğrulama yapılandırılamadı: {e}")
+    st.error(f"Kimlik doğrulama ayarları yüklenemedi: {e}")
     st.stop()
 
-# Giriş Panelini Göster 
-# v0.2.3 sürümünde login() parametre gerektirir: login(form_adı, konum)
+# Çerez hatasını önlemek için session_state başlatma
+if 'authentication_status' not in st.session_state:
+    st.session_state['authentication_status'] = None
+if 'name' not in st.session_state:
+    st.session_state['name'] = None
+if 'username' not in st.session_state:
+    st.session_state['username'] = None
+
+# Giriş Panelini Göster
+# Sürüm 0.2.3 için doğru login imzası
 name, authentication_status, username = authenticator.login('Giriş Yap', 'main')
 
-if authentication_status:
-    # --- 2. GÜVENLİ API VE SIDEBAR AYARLARI ---
+if st.session_state["authentication_status"]:
+    # --- 2. GÜVENLİ API VE SIDEBAR ---
     authenticator.logout('Çıkış Yap', 'sidebar')
     
     try:
@@ -37,7 +45,7 @@ if authentication_status:
         st.error("Hata: Secrets içinde 'ROBOFLOW_API_KEY' bulunamadı!")
         st.stop()
 
-    MODEL_ID = "mimari_duvar_tespiti-2/8"
+    MODEL_ID = "mimari_duvar_tespiti-2/8" #
     CLIENT = InferenceHTTPClient(api_url="https://detect.roboflow.com", api_key=ROBO_API_KEY)
 
     # --- 3. ANALİZ FONKSİYONLARI ---
@@ -74,7 +82,7 @@ if authentication_status:
 
     # --- 4. ARAYÜZ TASARIMI ---
     st.title("🏗️ DUVAR METRAJ PANELİ")
-    st.sidebar.success(f"Hoş geldin, {name}")
+    st.sidebar.success(f"Hoş geldin, {st.session_state['name']}")
 
     with st.sidebar:
         st.header("⚙️ Analiz Ayarları")
@@ -137,7 +145,7 @@ if authentication_status:
     else:
         st.info("👋 Başlamak için bir plan dosyası yükleyin.")
 
-elif authentication_status is False:
+elif st.session_state["authentication_status"] is False:
     st.error('Kullanıcı adı veya şifre hatalı')
-elif authentication_status is None:
+elif st.session_status["authentication_status"] is None:
     st.warning('Lütfen kullanıcı adı ve şifrenizi giriniz')
