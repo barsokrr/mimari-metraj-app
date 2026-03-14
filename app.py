@@ -3,42 +3,39 @@ import ezdxf
 import matplotlib.pyplot as plt
 import tempfile
 import math
-import cv2
 import numpy as np
 import streamlit_authenticator as stauth
 from inference_sdk import InferenceHTTPClient
 
 # --- 1. KİMLİK DOĞRULAMA (AUTH) YAPILANDIRMASI ---
-# Secrets'tan verileri hata almadan çekmek için kopyasını oluşturuyoruz
+# KeyError hatasını önlemek için modern yapılandırma
 try:
-    # TOML verisini doğrudan kullanmak yerine kopyasını alarak hata riskini sıfırlıyoruz
-    credentials = dict(st.secrets["credentials"])
-    cookie = dict(st.secrets["cookie"])
-    
+    # Secrets'tan verileri çekiyoruz
     authenticator = stauth.Authenticate(
-        credentials,
-        cookie['name'],
-        cookie['key'],
-        cookie['expiry_days']
+        st.secrets['credentials'].to_dict(), # Yeni sürüm için dict dönüşümü şart
+        st.secrets['cookie']['name'],
+        st.secrets['cookie']['key'],
+        st.secrets['cookie']['expiry_days']
     )
 except Exception as e:
-    st.error(f"Secrets yapılandırma hatası: {e}")
+    st.error(f"Kimlik doğrulama yapılandırılamadı: {e}")
     st.stop()
 
 # Giriş Panelini Göster
-name, authentication_status, username = authenticator.login('Giriş Yap', 'main')
+# name, authentication_status, username = authenticator.login('main') # Yeni sürüm imzası
+login_result = authenticator.login()
 
-if authentication_status:
+if st.session_state["authentication_status"]:
     # --- 2. GÜVENLİ API VE ARAYÜZ AYARLARI ---
     authenticator.logout('Çıkış Yap', 'sidebar')
     
     try:
-        ROBO_API_KEY = st.secrets["ROBOFLOW_API_KEY"] #
+        ROBO_API_KEY = st.secrets["ROBOFLOW_API_KEY"]
     except KeyError:
         st.error("Hata: Secrets içinde 'ROBOFLOW_API_KEY' bulunamadı!")
         st.stop()
 
-    MODEL_ID = "mimari_duvar_tespiti-2/8" #
+    MODEL_ID = "mimari_duvar_tespiti-2/8"
     CLIENT = InferenceHTTPClient(api_url="https://detect.roboflow.com", api_key=ROBO_API_KEY)
 
     # --- 3. FONKSİYONLAR ---
@@ -75,11 +72,12 @@ if authentication_status:
 
     # --- 4. ARAYÜZ TASARIMI ---
     st.title("🏗️ DUVAR METRAJ PANELİ")
+    st.sidebar.success(f"Hoş geldin, {st.session_state['name']}")
 
     with st.sidebar:
         st.header("⚙️ Analiz Ayarları")
         uploaded = st.file_uploader("Dosya Seç (DXF veya Görsel)", type=["dxf", "jpg", "png", "jpeg"])
-        kat_yuk = st.number_input("Kat Yüksekliği (m)", value=2.85, step=0.01) #
+        kat_yuk = st.number_input("Kat Yüksekliği (m)", value=2.85, step=0.01)
         birim = st.selectbox("Çizim Birimi (DXF)", ["cm", "mm", "m"], index=0)
         katmanlar = st.text_input("DXF Katman Filtresi", "DUVAR, WALL, MIM_DUVAR")
 
@@ -98,13 +96,13 @@ if authentication_status:
             if geos:
                 raw_len = calculate_total_length(geos)
                 bolen = 100 if birim == "cm" else (1000 if birim == "mm" else 1)
-                final_uzunluk = (raw_len / 2) / bolen # Çift çizgi düzeltmesi
+                final_uzunluk = (raw_len / 2) / bolen
 
         if geos:
             c1, c2 = st.columns([2, 1])
             with c1:
                 st.subheader("🔍 Plan Analiz Görünümü")
-                fig, ax = plt.subplots(figsize=(12, 10))
+                fig, ax = plt.subplots(figsize=(10, 8))
                 all_x, all_y = [], []
                 for g in geos:
                     xs, ys = zip(*g)
@@ -126,19 +124,18 @@ if authentication_status:
 
             with c2:
                 st.subheader("📊 Metraj Sonuçları")
-                st.metric("📏 Toplam Uzunluk", f"{round(final_uzunluk, 2)} m") #
+                st.metric("📏 Toplam Uzunluk", f"{round(final_uzunluk, 2)} m")
                 st.metric("🧱 Duvar Alanı", f"{round(final_uzunluk * kat_yuk, 2)} m²")
                 
-                # Referans Karşılaştırma
                 referans_deger = 58.08
                 sapma = final_uzunluk - referans_deger
                 st.metric("🎯 Referans Sapması", f"{round(sapma, 2)} m", delta=f"{round(sapma, 2)} m", delta_color="inverse")
         else:
-            st.warning("⚠️ Çizim bulunamadı.")
+            st.warning("⚠️ Çizim bulunamadı. Lütfen katmanları kontrol edin.")
     else:
         st.info("👋 Başlamak için bir plan dosyası yükleyin.")
 
-elif authentication_status == False:
+elif st.session_state["authentication_status"] is False:
     st.error('Kullanıcı adı veya şifre hatalı')
-elif authentication_status == None:
+elif st.session_state["authentication_status"] is None:
     st.warning('Lütfen kullanıcı adı ve şifrenizi giriniz')
