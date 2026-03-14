@@ -8,8 +8,8 @@ import numpy as np
 from inference_sdk import InferenceHTTPClient
 
 # --- YAPILANDIRMA ---
-ROBO_API_KEY = "my238ZSyFyxbwEVQHISP"
-MODEL_ID = "mimari_duvar_tespiti-2/8"
+ROBO_API_KEY = "my238ZSyFyxbwEVQHISP" # Kendi API anahtarınızı buraya girin
+MODEL_ID = "mimari_duvar_tespiti-2/8" #
 
 CLIENT = InferenceHTTPClient(
     api_url="https://detect.roboflow.com",
@@ -19,6 +19,7 @@ CLIENT = InferenceHTTPClient(
 # --- FONKSİYONLAR ---
 
 def read_dxf_geometry(path, target_layers):
+    """DXF'den duvar çizgilerini okur ve blokları patlatır."""
     try:
         doc = ezdxf.readfile(path)
         msp = doc.modelspace()
@@ -41,6 +42,7 @@ def read_dxf_geometry(path, target_layers):
                     if len(pts) > 1:
                         polygons.append(pts)
                 elif e.dxftype() == "LINE":
+                    # DXF koordinatlarını güvenli okuma
                     p1, p2 = e.dxf.start, e.dxf.end
                     polygons.append([(p1[0], p1[1]), (p2[0], p2[1])])
         return polygons
@@ -55,16 +57,17 @@ def calculate_total_length(geometries):
             total += math.dist(geo[i], geo[i+1])
     return total
 
-# --- ARAYÜZ ---
-st.set_page_config(page_title="Elifim Metraj Pro", layout="wide", page_icon="🏗️")
+# --- ARAYÜZ (STREAMLIT) ---
+st.set_page_config(page_title="Elifim Metraj Pro", layout="wide")
 st.title("🏗️ DUVAR METRAJ PANELİ")
 
 with st.sidebar:
     st.header("⚙️ Analiz Ayarları")
-    uploaded = st.file_uploader("Dosya Seç", type=["dxf", "pdf", "jpg", "png", "jpeg"])
-    kat_yuk = st.number_input("Kat Yüksekliği (m)", value=2.85, step=0.01) # image_15835f.jpg referansıyla güncellendi
-    birim = st.selectbox("Çizim Birimi (DXF)", ["cm", "mm", "m"], index=0)
-    katmanlar = st.text_input("DXF Katman Filtresi", "DUVAR, WALL, MIM_DUVAR")
+    uploaded = st.file_uploader("Dosya Seç (DXF veya Görsel)", type=["dxf", "jpg", "png", "jpeg"])
+    
+    kat_yuk = st.number_input("Kat Yüksekliği (m)", value=3.0, step=0.01) #
+    birim = st.selectbox("Çizim Birimi (DXF)", ["cm", "mm", "m"], index=0) #
+    katmanlar = st.text_input("DXF Katman Filtresi", "DUVAR, WALL, MIM_DUVAR") #
 
 if uploaded:
     with tempfile.NamedTemporaryFile(delete=False, suffix=f".{uploaded.name.split('.')[-1]}") as tmp:
@@ -72,50 +75,57 @@ if uploaded:
         file_path = tmp.name
 
     is_dxf = uploaded.name.lower().endswith(".dxf")
+    is_img = uploaded.name.lower().endswith((".jpg", ".png", ".jpeg"))
+
     geos = []
-    
     if is_dxf:
         target_layers = [x.strip() for x in katmanlar.split(",")] if katmanlar else []
         geos = read_dxf_geometry(file_path, target_layers)
         raw_len = calculate_total_length(geos)
         bolen = 100 if birim == "cm" else (1000 if birim == "mm" else 1)
-        final_uzunluk = (raw_len / 2) / bolen
+        final_uzunluk = (raw_len / 2) / bolen # Mimari çift çizgi düzeltmesi
 
     if geos:
         c1, c2 = st.columns([2, 1])
 
         with c1:
             st.subheader("🔍 Plan Analiz Görünümü")
-            plt.clf() 
-            fig, ax = plt.subplots(figsize=(12, 10))
+            plt.clf()
+            fig, ax = plt.subplots(figsize=(10, 8))
             
             all_x, all_y = [], []
             for g in geos:
                 xs, ys = zip(*g)
                 all_x.extend(xs)
                 all_y.extend(ys)
-                ax.plot(xs, ys, color="#e67e22", linewidth=1.2) # Çizgi kalınlığı biraz artırıldı
-            
-            # --- AKILLI ODAKLANMA (ZOOM) ---
+                ax.plot(xs, ys, color="#e67e22", linewidth=0.7)
+
+            # --- OTOMATİK ODAKLANMA (AUTO-ZOOM) ---
             if all_x and all_y:
-                x_min, x_max = min(all_x), max(all_x)
-                y_min, y_max = min(all_y), max(all_y)
-                pad_x = (x_max - x_min) * 0.05
-                pad_y = (y_max - y_min) * 0.05
+                # Koordinatların %2 ve %98'lik dilimlerini alarak uzak noktaları eliyoruz
+                x_min, x_max = np.percentile(all_x, [1, 99])
+                y_min, y_max = np.percentile(all_y, [1, 99])
+                
+                # Kenar payı ekle
+                pad_x = (x_max - x_min) * 0.1
+                pad_y = (y_max - y_min) * 0.1
+                
                 ax.set_xlim(x_min - pad_x, x_max + pad_x)
                 ax.set_ylim(y_min - pad_y, y_max + pad_y)
 
-            ax.set_aspect("equal", adjustable="box")
+            ax.set_aspect("equal", adjustable="datalim")
             ax.axis("off")
-            plt.tight_layout()
             st.pyplot(fig)
             plt.close(fig)
 
         with c2:
             st.subheader("📊 Metraj Sonuçları")
-            st.metric("📏 Toplam Uzunluk", f"{round(final_uzunluk, 2)} m")
-            st.metric("🧱 Duvar Alanı", f"{round(final_uzunluk * kat_yuk, 2)} m²")
+            st.metric("📏 Toplam Uzunluk", f"{round(final_uzunluk, 2)} m") #
+            st.metric("🧱 Duvar Alanı", f"{round(final_uzunluk * kat_yuk, 2)} m²") #
             
-            # Referans takibi (Görselinizdeki -1.84m sapma referansı)
+            # Referans sapma göstergesi
             sapma = final_uzunluk - 58.08
             st.metric("🎯 Referans Sapması", f"{round(sapma, 2)} m", delta=f"{round(sapma, 2)} m", delta_color="inverse")
+
+    else:
+        st.warning("Belirtilen katmanlarda çizim bulunamadı. Lütfen 'DXF Katman Filtresi'ni kontrol edin.")
