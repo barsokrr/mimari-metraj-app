@@ -5,10 +5,9 @@ import tempfile
 import math
 import pandas as pd
 
-# --- 1. SAYFA VE OTURUM YAPILANDIRMASI ---
+# --- 1. SAYFA VE GİRİŞ YAPILANDIRMASI ---
 st.set_page_config(page_title="SaaS Metraj Pro", layout="wide")
 
-# Oturum durumunu kontrol et (Senin başarılı giriş sistemin)
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
@@ -18,118 +17,113 @@ if not st.session_state.logged_in:
         user = st.text_input("Kullanıcı Adı")
         pw = st.text_input("Şifre", type="password")
         if st.form_submit_button("Giriş Yap"):
-            # admin/123 kontrolü
             if user == "admin" and pw == st.secrets["credentials"]["usernames"]["admin"]["password"]:
                 st.session_state.logged_in = True
                 st.rerun()
             else:
-                st.error("Hatalı kullanıcı adı veya şifre")
+                st.error("Hatalı giriş!")
     st.stop()
 
-# --- 2. GELİŞMİŞ DXF OKUMA FONKSİYONU ---
+# --- 2. EXCEL VERİ KÜTÜPHANESİ (Paylaştığın Dosyadan Alındı) ---
+# Bu liste Excel'deki kalemleri temsil eder
+imalat_kutuphanesi = [
+    {"poz": "15.150.1006", "ad": "C 30/37 Hazır Beton Dökülmesi (Beton Pompasıyla)", "birim": "m3"},
+    {"poz": "15.160.1003/Ö", "ad": "Ø 8- Ø 12 mm Nervürlü Beton Çelik Çubuğu", "birim": "ton"},
+    {"poz": "15.180.1003", "ad": "Plywood ile Düz Yüzeyli Betonarme Kalıbı Yapılması", "birim": "m2"},
+    {"poz": "15.215.1002", "ad": "19x19x13,5 cm Yatay Delikli Tuğla Duvar (13,5 cm kalınlık)", "birim": "m2"},
+    {"poz": "15.275.1106/Ö", "ad": "250 kg Çimento Dozlu Harç ile Kaba Sıva Yapılması", "birim": "m2"},
+    {"poz": "15.341.3003", "ad": "Taşyünü Levhalar ile Dış Duvarlarda Isı Yalıtımı (Mantolama)", "birim": "m2"},
+    {"poz": "15.540.1323", "ad": "Saf Akrilik Esaslı Su Bazlı Dış Cephe Boyası Yapılması", "birim": "m2"},
+    {"poz": "ÖZEL-01", "ad": "İç Cephe Alçı Sıva ve Boya İşleri", "birim": "m2"}
+]
+
+# --- 3. DXF ANALİZ MOTORU ---
 def get_dxf_geometry(path, target_layers=None):
-    """
-    target_layers None ise tüm projeyi okur. 
-    Liste verilirse sadece o katmanları filtreler.
-    """
     try:
         doc = ezdxf.readfile(path)
         msp = doc.modelspace()
         geometries = []
-        entities = msp.query('LINE LWPOLYLINE POLYLINE')
-        
+        entities = msp.query('LINE LWPOLYLINE POLYLINE INSERT')
         for e in entities:
-            # Katman filtresi kontrolü
             if target_layers:
-                layer_name = e.dxf.layer.upper()
-                if not any(t.upper() in layer_name for t in target_layers):
-                    continue
-            
-            # Geometri tipine göre koordinatları al
-            if e.dxftype() in ("LWPOLYLINE", "POLYLINE"):
-                pts = [(p[0], p[1]) for p in e.get_points()]
-                if len(pts) > 1: geometries.append(pts)
+                if not any(t.upper() in e.dxf.layer.upper() for t in target_list): continue
+            if e.dxftype() == "INSERT":
+                for sub_e in e.virtual_entities():
+                    if sub_e.dxftype() in ("LINE", "LWPOLYLINE", "POLYLINE"):
+                        pts = [(p[0], p[1]) for p in sub_e.get_points()] if hasattr(sub_e, 'get_points') else [(sub_e.dxf.start[0], sub_e.dxf.start[1]), (sub_e.dxf.end[0], sub_e.dxf.end[1])]
+                        geometries.append(pts)
+            elif e.dxftype() in ("LWPOLYLINE", "POLYLINE"):
+                geometries.append([(p[0], p[1]) for p in e.get_points()])
             elif e.dxftype() == "LINE":
                 geometries.append([(e.dxf.start[0], e.dxf.start[1]), (e.dxf.end[0], e.dxf.end[1])])
         return geometries
-    except Exception:
-        return []
+    except: return []
 
-# --- 3. ANA ARAYÜZ VE ANALİZ ---
-st.sidebar.success(f"Hoş geldin, BARIŞ") # Görselindeki isim
-if st.sidebar.button("Çıkış Yap"):
-    st.session_state.logged_in = False
-    st.rerun()
-
-st.title("🏗️ DUVAR METRAJ VE PLAN ANALİZİ")
+# --- 4. ARAYÜZ ---
+st.sidebar.success("Hoş geldin, BARIŞ")
+st.title("🏗️ AKILLI METRAJ VE İMALAT ANALİZİ")
 
 with st.sidebar:
-    st.header("⚙️ Ayarlar")
-    uploaded = st.file_uploader("Dosya Seç (DXF)", type=["dxf"])
-    kat_yuk = st.number_input("Kat Yüksekliği (m)", value=2.85)
-    birim = st.selectbox("Çizim Birimi", ["cm", "mm", "m"], index=0)
-    katmanlar = st.text_input("Katman Filtresi", "DUVAR")
+    st.header("📋 İmalat Seçimi")
+    # Excel kalemlerini seçilebilir liste yaptık
+    secilen_imalat_adi = st.selectbox(
+        "Metrajı Yapılacak Kalem", 
+        [f"{i['poz']} - {i['ad']}" for i in imalat_kutuphanesi]
+    )
+    # Seçilen kalemin verilerini ayıkla
+    secilen_poz = secilen_imalat_adi.split(" - ")[0]
+    secilen_detay = next(item for item in imalat_kutuphanesi if item["poz"] == secilen_poz)
+
+    st.divider()
+    st.header("⚙️ Dosya ve Ayarlar")
+    uploaded = st.file_uploader("DXF Yükle", type=["dxf"])
+    kat_yuk = st.number_input("Yükseklik (Boy) (m)", value=2.85)
+    birim_tipi = st.selectbox("Çizim Birimi", ["cm", "mm", "m"], index=0)
+    katman_ara = st.text_input("DXF Katman Filtresi", "DUVAR")
 
 if uploaded:
     with tempfile.NamedTemporaryFile(delete=False, suffix=".dxf") as tmp:
         tmp.write(uploaded.getbuffer())
         file_path = tmp.name
 
-    # Veri Hazırlama
-    target_list = [x.strip() for x in katmanlar.split(",")]
-    full_project = get_dxf_geometry(file_path) # Tüm proje
-    wall_analysis = get_dxf_geometry(file_path, target_list) # Filtrelenmiş duvarlar
+    target_list = [x.strip() for x in katman_ara.split(",")]
+    with st.spinner("Analiz ediliyor..."):
+        full_project = get_dxf_geometry(file_path)
+        analysis_data = get_dxf_geometry(file_path, target_list)
 
-    if wall_analysis:
-        # Hesaplama Mantığı
-        raw_len = sum(math.dist(g[i], g[i+1]) for g in wall_analysis for i in range(len(g)-1))
-        bolen = 100 if birim == "cm" else (1000 if birim == "mm" else 1)
-        net_uzunluk = (raw_len / 2) / bolen # Mimari çift çizgi düzeltmesi
-        toplam_alan = net_uzunluk * kat_yuk
+    if analysis_data:
+        # Metraj Hesaplama
+        raw_len = sum(math.dist(g[i], g[i+1]) for g in analysis_data for i in range(len(g)-1))
+        bolen = 100 if birim_tipi == "cm" else (1000 if birim_tipi == "mm" else 1)
+        net_metraj = (raw_len / 2) / bolen 
+        miktar = net_metraj * kat_yuk if secilen_detay["birim"] == "m2" else net_metraj
 
-        st.success(f"✅ {len(wall_analysis)} adet duvar objesi tespit edildi.")
+        # Görseller
+        c1, c2 = st.columns(2)
+        with c1:
+            st.subheader("🖼️ Plan")
+            fig1, ax1 = plt.subplots(); [ax1.plot(*zip(*g), color="gray", lw=0.1, alpha=0.3) for g in full_project]
+            ax1.set_aspect("equal"); ax1.axis("off"); st.pyplot(fig1)
+        with c2:
+            st.subheader("🔍 Seçili İmalat Hattı")
+            fig2, ax2 = plt.subplots(); [ax2.plot(*zip(*g), color="#e67e22", lw=1) for g in analysis_data]
+            ax2.set_aspect("equal"); ax2.axis("off"); st.pyplot(fig2)
 
-        # --- YAN YANA GÖRSELLEŞTİRME ---
-        col_img1, col_img2 = st.columns(2)
-        
-        with col_img1:
-            st.subheader("🖼️ Orijinal Plan (Tümü)")
-            fig1, ax1 = plt.subplots(figsize=(8, 8))
-            for g in full_project:
-                xs, ys = zip(*g)
-                ax1.plot(xs, ys, color="gray", linewidth=0.2, alpha=0.4)
-            ax1.set_aspect("equal")
-            ax1.axis("off")
-            st.pyplot(fig1)
-
-        with col_img2:
-            st.subheader("🔍 Duvar Analizi (Filtreli)")
-            fig2, ax2 = plt.subplots(figsize=(8, 8))
-            for g in wall_analysis:
-                xs, ys = zip(*g)
-                ax2.plot(xs, ys, color="#e67e22", linewidth=1)
-            ax2.set_aspect("equal")
-            ax2.axis("off")
-            st.pyplot(fig2)
-
-        # --- METRAJ BİLGİLERİ VE RAPOR ---
+        # --- EXCEL FORMATLI ÇIKTI ---
         st.divider()
-        c1, c2, c3 = st.columns(3)
-        c1.metric("📏 Toplam Uzunluk", f"{round(net_uzunluk, 2)} m")
-        c2.metric("🧱 Toplam Duvar Alanı", f"{round(toplam_alan, 2)} m²")
+        st.subheader(f"📊 Metraj Cetveli: {secilen_detay['ad']}")
         
-        # Rapor Tablosu
-        df = pd.DataFrame({
-            "Açıklama": ["Toplam Duvar Metrajı"],
-            "Uzunluk (m)": [round(net_uzunluk, 4)],
-            "Yükseklik (m)": [kat_yuk],
-            "Alan (m2)": [round(toplam_alan, 4)]
+        df_final = pd.DataFrame({
+            "S. NO": [1],
+            "POZ/KOD": [secilen_detay["poz"]],
+            "İMALATIN ADI": [secilen_detay["ad"]],
+            "BİRİM": [secilen_detay["birim"]],
+            "EN (Uzunluk)": [round(net_metraj, 2)],
+            "BOY (Yükseklik)": [round(kat_yuk, 2) if secilen_detay["birim"] == "m2" else "-"],
+            "MİKTAR": [round(miktar, 2)]
         })
-        st.table(df)
         
-        csv = df.to_csv(index=False).encode('utf-8')
-        st.download_button("📥 Metraj Cetvelini İndir (CSV)", csv, "metraj_raporu.csv", "text/csv")
-        
-        st.info("💡 Not: Uzunluk hesabı mimari çift çizgiye göre otomatik optimize edilmiştir.")
+        st.table(df_final)
+        st.download_button("📥 Excel Formatında İndir", df_final.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig'), "metraj.csv")
     else:
-        st.warning("⚠️ Seçilen katmanda veri bulunamadı.")
+        st.warning("Seçilen katmanda veri bulunamadı.")
