@@ -6,145 +6,149 @@ import math
 import pandas as pd
 import os
 
-# --- 1. AYARLAR VE GİRİŞ SİSTEMİ ---
-st.set_page_config(page_title="SaaS Metraj Pro", layout="wide")
+# --- 1. GÜVENLİK VE YAPILANDIRMA ---
+st.set_page_config(page_title="SaaS Metraj Pro | Kusursuz Sürüm", layout="wide", page_icon="🏗️")
 
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
 if not st.session_state.logged_in:
-    st.title("🏗️ SaaS Metraj Giriş")
+    st.title("🛡️ Kurumsal Metraj Giriş")
     with st.form("login_form"):
         user = st.text_input("Kullanıcı Adı")
         pw = st.text_input("Şifre", type="password")
         if st.form_submit_button("Giriş Yap"):
-            # Secrets kontrolü (Streamlit Cloud'da ayarlı olmalıdır)
             try:
-                admin_pw = st.secrets["credentials"]["usernames"]["admin"]["password"]
-                if user == "admin" and pw == admin_pw:
+                # Streamlit Secrets veya manuel yedek şifre
+                admin_pass = st.secrets["credentials"]["usernames"]["admin"]["password"] if "credentials" in st.secrets else "123"
+                if user == "admin" and pw == admin_pass:
                     st.session_state.logged_in = True
                     st.rerun()
                 else:
-                    st.error("Hatalı kullanıcı adı veya şifre")
+                    st.error("Hatalı Giriş Bilgileri!")
             except:
-                # Yerel çalışma için yedek (Test amaçlı)
-                if user == "admin" and pw == "123":
-                    st.session_state.logged_in = True
-                    st.rerun()
+                st.error("Sistem Hatası: Lütfen Secrets ayarlarını kontrol edin.")
     st.stop()
 
-# --- 2. DXF VERİ OKUMA MOTORU (GÜNCELLENDİ) ---
-def get_dxf_geometry(path, target_layers=None):
-    """
-    DXF dosyasını okur ve belirtilen katmandaki çizgilerin koordinatlarını döndürür.
-    """
+# --- 2. HATASIZ GEOMETRİ ANALİZ MOTORU ---
+def get_dxf_data(file_path, filter_layers):
     try:
-        doc = ezdxf.readfile(path)
+        doc = ezdxf.readfile(file_path)
         msp = doc.modelspace()
-        geometries = []
+        geoms = []
         
-        # Katman isimlerini standardize et
-        if target_layers:
-            target_layers = [t.upper().strip() for t in target_layers if t.strip()]
-
-        # Tüm geometri tiplerini tara
-        entities = msp.query('LINE LWPOLYLINE POLYLINE')
+        # Katman isimlerini temizle (Boşlukları al ve büyüt)
+        target_layers = [t.upper().strip() for t in filter_layers.split(",") if t.strip()]
+        
+        # DÜZELTME 1: Blokları (INSERT) da sorguya dahil et
+        entities = msp.query('LINE LWPOLYLINE POLYLINE INSERT')
         
         for e in entities:
-            # Katman filtresi
-            if target_layers and e.dxf.layer.upper() not in target_layers:
+            # DÜZELTME 2: AutoCAD katmanındaki görünmez boşlukları temizle
+            layer_name = e.dxf.layer.upper().strip()
+            
+            # DÜZELTME 3: Birebir eşleşme değil, "İçeriyor mu?" (Substring) kontrolü yap
+            if target_layers and not any(t in layer_name for t in target_layers):
                 continue
             
-            pts = []
-            if e.dxftype() == "LINE":
-                pts = [(e.dxf.start.x, e.dxf.start.y), (e.dxf.end.x, e.dxf.end.y)]
-            elif e.dxftype() in ("LWPOLYLINE", "POLYLINE"):
-                pts = [(p[0], p[1]) for p in e.get_points()]
+            pts_list = []
             
-            if len(pts) > 1:
-                geometries.append(pts)
-        
-        return geometries
+            # Eğer obje bir Blok/Grup (INSERT) ise, bloğun içindeki çizgileri patlatarak al
+            if e.dxftype() == "INSERT":
+                for sub_e in e.virtual_entities():
+                    if sub_e.dxftype() == "LINE":
+                        pts_list.append([(sub_e.dxf.start.x, sub_e.dxf.start.y), (sub_e.dxf.end.x, sub_e.dxf.end.y)])
+                    elif sub_e.dxftype() in ("LWPOLYLINE", "POLYLINE"):
+                        pts_list.append([(p[0], p[1]) for p in sub_e.get_points()])
+            else:
+                # Normal çizgiler
+                if e.dxftype() == "LINE":
+                    pts_list.append([(e.dxf.start.x, e.dxf.start.y), (e.dxf.end.x, e.dxf.end.y)])
+                elif e.dxftype() in ("LWPOLYLINE", "POLYLINE"):
+                    pts_list.append([(p[0], p[1]) for p in e.get_points()])
+            
+            # Elde edilen tüm koordinatları ana listeye ekle
+            for pts in pts_list:
+                if len(pts) > 1:
+                    geoms.append(pts)
+                    
+        return geoms
     except Exception as e:
-        st.error(f"Veri Okuma Hatası: {e}")
+        st.error(f"DXF Okuma Hatası: {e}")
         return []
 
-# --- 3. ANA ARAYÜZ VE ANALİZ ---
-st.sidebar.success(f"Hoş geldin, BARIŞ")
+# --- 3. ANA PANEL ---
+st.sidebar.success("Oturum Aktif: BARIŞ")
+st.title("🏗️ Profesyonel Metraj ve Analiz Platformu")
 
 with st.sidebar:
-    st.header("⚙️ Proje Ayarları")
-    uploaded = st.file_uploader("DXF Dosyası Seç", type=["dxf"])
-    kat_yuk = st.number_input("Kat Yüksekliği (m)", value=2.85)
-    birim = st.selectbox("Çizim Birimi", ["cm", "mm", "m"], index=0)
-    katmanlar_input = st.text_input("Hedef Katman (Örn: DUVAR)", "DUVAR")
+    st.header("⚙️ Veri Girişi")
+    uploaded_file = st.file_uploader("AutoCAD DXF Dosyası", type=["dxf"])
+    kat_yuk = st.number_input("Duvar Yüksekliği (m)", value=2.85, format="%.2f")
+    birim_tipi = st.selectbox("Çizim Birimi", ["cm", "mm", "m"], index=0)
+    layer_name = st.text_input("Layer (Katman) İsmi", "DUVAR")
     
     st.divider()
-    cizim_modu = st.radio("Hesaplama Modu", ["Tek Çizgi (Aks)", "Çift Çizgi (Mimari)"], index=1)
+    st.header("📐 Hesaplama Ayarı")
+    cizim_modu = st.radio("Metot", ["Tek Çizgi (Aks Ölçümü)", "Çift Çizgi (Mimari Duvar)"], index=1)
 
-if uploaded:
-    # 1. DOSYAYI GEÇİCİ OLARAK KAYDET (ezdxf için şart)
+if uploaded_file:
+    # GEÇİCİ DOSYA OLUŞTURMA
     with tempfile.NamedTemporaryFile(delete=False, suffix=".dxf") as tmp:
-        tmp.write(uploaded.getbuffer())
-        file_path = tmp.name
+        tmp.write(uploaded_file.getbuffer())
+        temp_path = tmp.name
 
-    # 2. VERİLERİ ÇEK
-    target_list = [x.strip() for x in katmanlar_input.split(",")]
-    wall_analysis = get_dxf_geometry(file_path, target_list)
+    # Veri Analizi
+    wall_data = get_dxf_data(temp_path, layer_name)
 
-    if wall_analysis:
-        # 3. HASSAS UZUNLUK HESABI
-        toplam_ham_uzunluk = 0
-        for g in wall_analysis:
-            for i in range(len(g) - 1):
-                # Öklid mesafesi formülü
-                dist = math.sqrt((g[i+1][0] - g[i][0])**2 + (g[i+1][1] - g[i][1])**2)
-                toplam_ham_uzunluk += dist
+    if wall_data:
+        total_unit_length = 0
+        for poly in wall_data:
+            for i in range(len(poly) - 1):
+                # Hassas 2D Öklid Mesafesi
+                d = math.sqrt((poly[i+1][0] - poly[i][0])**2 + (poly[i+1][1] - poly[i][1])**2)
+                total_unit_length += d
 
-        # 4. ÖLÇEK VE MİKTAR DÜZELTMELERİ
-        bolen = 100 if birim == "cm" else (1000 if birim == "mm" else 1)
-        metre_uzunluk = toplam_ham_uzunluk / bolen
-
-        if cizim_modu == "Çift Çizgi (Mimari)":
-            final_uzunluk = metre_uzunluk / 2
-        else:
-            final_uzunluk = metre_uzunluk
-
-        toplam_alan = final_uzunluk * kat_yuk
-
-        # 5. EKRANA YAZDIRMA
-        st.success(f"✅ Veri başarıyla yüklendi: {len(wall_analysis)} adet çizgi bulundu.")
+        # Ölçekleme (Unit -> Metre)
+        scale = 100 if birim_tipi == "cm" else (1000 if birim_tipi == "mm" else 1)
+        raw_meters = total_unit_length / scale
         
-        col1, col2, col3 = st.columns(3)
-        col1.metric("📏 Toplam Metraj", f"{round(final_uzunluk, 2)} m")
-        col2.metric("🧱 Duvar Alanı", f"{round(toplam_alan, 2)} m²")
-        col3.metric("📂 Obje Sayısı", len(wall_analysis))
+        # Çizim moduna göre final uzunluk
+        final_l = raw_meters / 2 if cizim_modu == "Çift Çizgi (Mimari Duvar)" else raw_meters
+        final_area = final_l * kat_yuk
 
-        # Rapor Tablosu
-        df_res = pd.DataFrame({
-            "Açıklama": ["Duvar Analizi"],
-            "Ham Veri (AutoCAD Birimi)": [round(toplam_ham_uzunluk, 2)],
-            "Birim": [birim],
-            "Net Uzunluk (m)": [round(final_uzunluk, 3)],
+        # SONUÇ EKRANI
+        st.success(f"Analiz Başarılı! {len(wall_data)} adet duvar segmenti tespit edildi.")
+        
+        m1, m2, m3 = st.columns(3)
+        m1.metric("📏 Net Uzunluk", f"{round(final_l, 2)} m")
+        m2.metric("🧱 Toplam Alan", f"{round(final_area, 2)} m²")
+        m3.metric("🔍 Ham Veri", f"{round(total_unit_length, 1)} unit")
+
+        # Raporlama
+        df_final = pd.DataFrame({
+            "İmalat": ["Duvar Kaplama/İmalat"],
+            "Birim": [birim_tipi],
+            "Net Metraj (m)": [round(final_l, 3)],
             "Yükseklik (m)": [kat_yuk],
-            "Alan (m2)": [round(toplam_alan, 3)]
+            "Toplam Alan (m2)": [round(final_area, 3)]
         })
-        st.table(df_res)
+        st.dataframe(df_final, use_container_width=True)
 
         # Görselleştirme
-        fig, ax = plt.subplots(figsize=(10, 6))
-        for g in wall_analysis:
-            x, y = zip(*g)
-            ax.plot(x, y, color="#2ecc71", linewidth=2)
+        fig, ax = plt.subplots(figsize=(10, 4))
+        for line in wall_data:
+            x_coords, y_coords = zip(*line)
+            ax.plot(x_coords, y_coords, color="#e67e22", lw=2)
         ax.set_aspect("equal")
         ax.axis("off")
         st.pyplot(fig)
-
+        
     else:
-        st.warning(f"⚠️ '{katmanlar_input}' katmanında veri bulunamadı. Lütfen AutoCAD katman ismini kontrol edin.")
-    
-    # Geçici dosyayı sil (Güvenlik için)
-    if os.path.exists(file_path):
-        os.remove(file_path)
+        st.error(f"❌ '{layer_name}' katmanında veya blokların içinde uygun çizgi bulunamadı. Lütfen layer ismini kontrol edin.")
+
+    # Temizlik: Geçici dosyayı sil
+    if os.path.exists(temp_path):
+        os.remove(temp_path)
 else:
-    st.info("💡 Lütfen sol menüden bir DXF dosyası yükleyerek başlayın.")
+    st.info("💡 Başlamak için lütfen sol taraftan bir DXF dosyası yükleyin.")
