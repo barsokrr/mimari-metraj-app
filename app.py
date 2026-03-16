@@ -6,261 +6,220 @@ import math
 import pandas as pd
 import os
 import numpy as np
-from matplotlib.patches import Arc, Circle
 
-# --- 1. KURUMSAL TEMA VE SAYFA AYARI ---
+# -------------------------------------------------
+# SAYFA AYARI
+# -------------------------------------------------
 st.set_page_config(page_title="Metraj Pro | Barış Öker", layout="wide", page_icon="🏢")
 
 st.markdown("""
 <style>
-.stApp { background-color: #0e1117; }
-
-[data-testid="stMetricValue"], 
-[data-testid="stMetricLabel"] {
-color: #000000 !important;
-}
-
-div[data-testid="stMetric"] {
-background-color: #ffffff;
-border: 1px solid #dcdde1;
-padding: 20px;
-border-radius: 12px;
-}
-
-h1, h2, h3, p { color: #ffffff !important; }
+.stApp { background-color:#0e1117; }
+[data-testid="stMetricValue"],[data-testid="stMetricLabel"]{color:#000!important;}
+div[data-testid="stMetric"]{background:#fff;border:1px solid #dcdde1;padding:20px;border-radius:12px;}
+h1,h2,h3,p{color:#fff!important;}
 </style>
 """, unsafe_allow_html=True)
 
-if 'logged_in' not in st.session_state:
-    st.session_state.logged_in = False
+# -------------------------------------------------
+# LOGIN
+# -------------------------------------------------
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in=False
 
-# --- 2. GİRİŞ EKRANI ---
 if not st.session_state.logged_in:
 
-    _, col_mid, _ = st.columns([1,1.2,1])
+    _,c,_=st.columns([1,1.2,1])
 
-    with col_mid:
-
-        st.markdown("<br><br>", unsafe_allow_html=True)
+    with c:
         st.title("🏢 Metraj Pro Giriş")
 
-        with st.form("login_form"):
+        with st.form("login"):
+            u=st.text_input("Kullanıcı")
+            p=st.text_input("Şifre",type="password")
+            s=st.form_submit_button("Başlat")
 
-            user_input = st.text_input("Kullanıcı")
-            pass_input = st.text_input("Şifre", type="password")
-
-            submit_button = st.form_submit_button("Sistemi Başlat")
-
-            if submit_button:
-
-                if user_input == "admin" and pass_input == "123":
-
-                    st.session_state.logged_in = True
+            if s:
+                if u=="admin" and p=="123":
+                    st.session_state.logged_in=True
                     st.rerun()
-
                 else:
-
-                    st.error("Giriş bilgileri hatalı!")
+                    st.error("Giriş hatalı")
 
     st.stop()
 
+# -------------------------------------------------
+# DXF SEGMENT OKUMA
+# -------------------------------------------------
+def read_segments(path,scale,layers):
 
-# --- 3. ANALİZ MOTORU ---
+    doc=ezdxf.readfile(path)
+    msp=doc.modelspace()
 
-def get_p2l_dist(p, line):
+    segments=[]
 
-    p1, p2 = np.array(line[0]), np.array(line[1])
-    p3 = np.array(p)
+    targets=[l.upper().strip() for l in layers.split(",") if l.strip()]
 
-    if np.array_equal(p1,p2):
-        return np.linalg.norm(p3-p1)
+    for e in msp.query("LINE LWPOLYLINE POLYLINE INSERT"):
 
-    return np.abs(np.cross(p2-p1, p1-p3)) / np.linalg.norm(p2-p1)
-
-
-def autonomous_engine(path, scale, layers):
-
-    MIN_L = 0.25
-    GAP_TOL = 0.35
-
-    try:
-
-        doc = ezdxf.readfile(path)
-        msp = doc.modelspace()
-
-        segments = []
-
-        targets = [l.upper().strip() for l in layers.split(",") if l.strip()]
-
-        for e in msp.query('LINE LWPOLYLINE POLYLINE INSERT'):
-
-            if targets and not any(t in e.dxf.layer.upper() for t in targets):
+        if targets:
+            if not any(t in e.dxf.layer.upper() for t in targets):
                 continue
 
-            temp_pts = []
+        temp=[]
 
-            if e.dxftype() == "INSERT":
+        if e.dxftype()=="LINE":
+            temp.append(((e.dxf.start.x,e.dxf.start.y),(e.dxf.end.x,e.dxf.end.y)))
 
-                for sub in e.virtual_entities():
+        elif e.dxftype() in ("LWPOLYLINE","POLYLINE"):
+            pts=list(e.get_points())
+            for i in range(len(pts)-1):
+                temp.append(((pts[i][0],pts[i][1]),(pts[i+1][0],pts[i+1][1])))
 
-                    if sub.dxftype() == "LINE":
+        elif e.dxftype()=="INSERT":
+            for sub in e.virtual_entities():
+                if sub.dxftype()=="LINE":
+                    temp.append(((sub.dxf.start.x,sub.dxf.start.y),(sub.dxf.end.x,sub.dxf.end.y)))
 
-                        temp_pts.append(
-                            ((sub.dxf.start.x, sub.dxf.start.y),
-                             (sub.dxf.end.x, sub.dxf.end.y))
-                        )
+        for s in temp:
 
-            elif e.dxftype() == "LINE":
+            p1=(s[0][0]/scale,s[0][1]/scale)
+            p2=(s[1][0]/scale,s[1][1]/scale)
 
-                temp_pts.append(
-                    ((e.dxf.start.x, e.dxf.start.y),
-                     (e.dxf.end.x, e.dxf.end.y))
-                )
+            ln=math.dist(p1,p2)
 
-            elif e.dxftype() in ("LWPOLYLINE","POLYLINE"):
+            if ln>0.20:
+                segments.append({"p1":p1,"p2":p2,"len":ln})
 
-                pts = list(e.get_points())
+    return segments
 
-                for i in range(len(pts)-1):
+# -------------------------------------------------
+# PARALEL DUVAR TESPİTİ
+# -------------------------------------------------
+def detect_walls(segments):
 
-                    temp_pts.append(
-                        ((pts[i][0], pts[i][1]),
-                         (pts[i+1][0], pts[i+1][1]))
-                    )
+    walls=[]
+    used=set()
 
-            for s in temp_pts:
+    ANGLE_TOL=5
+    DIST_TOL=0.35
 
-                p1 = (s[0][0]/scale, s[0][1]/scale)
-                p2 = (s[1][0]/scale, s[1][1]/scale)
+    for i,a in enumerate(segments):
 
-                ln = math.dist(p1,p2)
+        if i in used:
+            continue
 
-                if ln >= MIN_L:
+        ax=a["p2"][0]-a["p1"][0]
+        ay=a["p2"][1]-a["p1"][1]
 
-                    segments.append(
-                        {'path':(p1,p2),'len':ln,'active':True}
-                    )
+        ang1=math.degrees(math.atan2(ay,ax))
 
-        segments.sort(key=lambda x: x['len'], reverse=True)
+        for j,b in enumerate(segments):
 
-        final=[]
-
-        for i in range(len(segments)):
-
-            if not segments[i]['active']:
+            if i==j or j in used:
                 continue
 
-            base = segments[i]
+            bx=b["p2"][0]-b["p1"][0]
+            by=b["p2"][1]-b["p1"][1]
 
-            base['active'] = False
+            ang2=math.degrees(math.atan2(by,bx))
 
-            final.append(base)
+            if abs(abs(ang1-ang2))<ANGLE_TOL:
 
-            for j in range(i+1,len(segments)):
+                d=np.linalg.norm(np.array(a["p1"])-np.array(b["p1"]))
 
-                if not segments[j]['active']:
-                    continue
+                if d<DIST_TOL:
 
-                if get_p2l_dist(segments[j]['path'][0],base['path']) < GAP_TOL:
+                    mid1=((a["p1"][0]+b["p1"][0])/2,(a["p1"][1]+b["p1"][1])/2)
+                    mid2=((a["p2"][0]+b["p2"][0])/2,(a["p2"][1]+b["p2"][1])/2)
 
-                    segments[j]['active']=False
+                    ln=math.dist(mid1,mid2)
 
-        return final
+                    walls.append({
+                        "path":(mid1,mid2),
+                        "len":ln
+                    })
 
-    except:
+                    used.add(i)
+                    used.add(j)
 
-        return []
+                    break
 
+    return walls
 
-# --- 4. SIDEBAR PANEL ---
-
+# -------------------------------------------------
+# SIDEBAR
+# -------------------------------------------------
 st.sidebar.title("📊 Metraj Kontrol Paneli")
 
 with st.sidebar:
 
-    st.success("👤 Kullanıcı Adı: Barış Öker")
+    st.success("👤 Kullanıcı: Barış Öker")
 
-    dxf_up = st.file_uploader("DXF Dosyası Seçin", type=["dxf"])
+    dxf_file=st.file_uploader("DXF Yükle",type=["dxf"])
 
-    layer_sel = st.text_input("1. Katman (Layer)", "DUVAR")
+    layer=st.text_input("Katman","DUVAR")
 
-    unit_sel = st.selectbox(
-        "2. Çizim Birimi",
-        ["cm","mm","m"],
-        index=0
-    )
+    unit=st.selectbox("Birim",["cm","mm","m"],index=0)
 
-    h_sel = st.number_input(
-        "3. Yükseklik (m)",
-        value=2.85,
-        step=0.01
-    )
+    height=st.number_input("Yükseklik (m)",value=2.85,step=0.01)
 
-    st.divider()
-
-    if st.button("Güvenli Çıkış"):
-
-        st.session_state.logged_in = False
+    if st.button("Çıkış"):
+        st.session_state.logged_in=False
         st.rerun()
 
+# -------------------------------------------------
+# ANALİZ
+# -------------------------------------------------
+if dxf_file:
 
-# --- 5. DXF YÜKLEME VE ANALİZ ---
+    with tempfile.NamedTemporaryFile(delete=False,suffix=".dxf") as tmp:
+        tmp.write(dxf_file.getbuffer())
+        path=tmp.name
 
-if dxf_up:
+    scale=100 if unit=="cm" else 1000 if unit=="mm" else 1
 
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".dxf") as tmp:
+    segments=read_segments(path,scale,layer)
 
-        tmp.write(dxf_up.getbuffer())
+    walls=detect_walls(segments)
 
-        t_path = tmp.name
+    if walls:
 
-
-    sc = 100 if unit_sel=="cm" else (1000 if unit_sel=="mm" else 1)
-
-    res = autonomous_engine(t_path, sc, layer_sel)
-
-
-    if res:
-
-        total_l = sum(r['len'] for r in res)
+        total=sum(w["len"] for w in walls)
 
         st.subheader("Analiz Raporu")
 
-        c1,c2,c3 = st.columns(3)
+        c1,c2,c3=st.columns(3)
 
-        c1.metric("Net Uzunluk", f"{round(total_l,2)} m")
+        c1.metric("Net Uzunluk",f"{round(total,2)} m")
 
-        c2.metric("Toplam Alan", f"{round(total_l*h_sel,2)} m²")
+        c2.metric("Toplam Alan",f"{round(total*height,2)} m²")
 
-        c3.metric("Aks Sayısı", len(res))
+        c3.metric("Duvar Sayısı",len(walls))
 
-
+        # -------------------------------------------------
+        # GÖRSEL
+        # -------------------------------------------------
         st.subheader("Analiz Önizleme")
 
-        v1,v2 = st.columns(2)
-
-
-        # --- ORİJİNAL PLAN ÇİZİMİ ---
+        v1,v2=st.columns(2)
 
         with v1:
 
-            st.markdown("<p style='text-align:center'>Orijinal Çizim</p>", unsafe_allow_html=True)
+            fig,ax=plt.subplots(figsize=(8,6),facecolor="#0e1117")
 
-            fig1, ax1 = plt.subplots(figsize=(8,6), facecolor='#0e1117')
+            doc=ezdxf.readfile(path)
+            msp=doc.modelspace()
 
-            doc_raw = ezdxf.readfile(t_path)
-
-            msp_raw = doc_raw.modelspace()
-
-            for e in msp_raw:
+            for e in msp.query("LINE LWPOLYLINE POLYLINE"):
 
                 if e.dxftype()=="LINE":
 
-                    ax1.plot(
-                        [e.dxf.start.x, e.dxf.end.x],
-                        [e.dxf.start.y, e.dxf.end.y],
+                    ax.plot(
+                        [e.dxf.start.x,e.dxf.end.x],
+                        [e.dxf.start.y,e.dxf.end.y],
                         color="#576574",
-                        lw=0.6
+                        lw=0.5
                     )
 
                 elif e.dxftype() in ("LWPOLYLINE","POLYLINE"):
@@ -269,102 +228,49 @@ if dxf_up:
 
                     for i in range(len(pts)-1):
 
-                        ax1.plot(
+                        ax.plot(
                             [pts[i][0],pts[i+1][0]],
                             [pts[i][1],pts[i+1][1]],
                             color="#576574",
-                            lw=0.6
+                            lw=0.5
                         )
 
-                elif e.dxftype()=="CIRCLE":
+            ax.set_aspect("equal")
+            ax.axis("off")
 
-                    circle = Circle(
-                        (e.dxf.center.x, e.dxf.center.y),
-                        e.dxf.radius,
-                        fill=False,
-                        color="#576574",
-                        lw=0.6
-                    )
-
-                    ax1.add_patch(circle)
-
-                elif e.dxftype()=="ARC":
-
-                    arc = Arc(
-                        (e.dxf.center.x, e.dxf.center.y),
-                        e.dxf.radius*2,
-                        e.dxf.radius*2,
-                        angle=0,
-                        theta1=e.dxf.start_angle,
-                        theta2=e.dxf.end_angle,
-                        color="#576574",
-                        lw=0.6
-                    )
-
-                    ax1.add_patch(arc)
-
-                elif e.dxftype()=="INSERT":
-
-                    for sub in e.virtual_entities():
-
-                        if sub.dxftype()=="LINE":
-
-                            ax1.plot(
-                                [sub.dxf.start.x, sub.dxf.end.x],
-                                [sub.dxf.start.y, sub.dxf.end.y],
-                                color="#576574",
-                                lw=0.6
-                            )
-
-
-            ax1.set_aspect("equal")
-            ax1.axis("off")
-
-            st.pyplot(fig1)
-
-
-        # --- ANALİZ AKSLARI ---
+            st.pyplot(fig)
 
         with v2:
 
-            st.markdown("<p style='text-align:center'>Analiz Edilen Akslar</p>", unsafe_allow_html=True)
+            fig,ax=plt.subplots(figsize=(8,6),facecolor="#0e1117")
 
-            fig2, ax2 = plt.subplots(figsize=(8,6), facecolor='#0e1117')
+            for w in walls:
 
-            for r in res:
+                p1,p2=w["path"]
 
-                p1,p2 = r['path']
-
-                ax2.plot(
-                    [p1[0]*sc, p2[0]*sc],
-                    [p1[1]*sc, p2[1]*sc],
+                ax.plot(
+                    [p1[0]*scale,p2[0]*scale],
+                    [p1[1]*scale,p2[1]*scale],
                     color="#00d2ff",
                     lw=2
                 )
 
-            ax2.set_aspect("equal")
-            ax2.axis("off")
+            ax.set_aspect("equal")
+            ax.axis("off")
 
-            st.pyplot(fig2)
+            st.pyplot(fig)
 
+        # -------------------------------------------------
+        # TABLO
+        # -------------------------------------------------
+        st.subheader("📋 Metraj Listesi")
 
-        # --- DETAY TABLOSU ---
+        df=pd.DataFrame([{
+            "No":i+1,
+            "Uzunluk (m)":round(w["len"],2),
+            "Alan (m²)":round(w["len"]*height,2)
+        } for i,w in enumerate(walls)])
 
-        st.subheader("📋 Metraj Detay Listesi")
+        st.dataframe(df,use_container_width=True)
 
-        df = pd.DataFrame([
-
-            {
-                "No":i+1,
-                "Uzunluk (m)":round(r['len'],2),
-                "Alan (m²)":round(r['len']*h_sel,2)
-
-            }
-
-            for i,r in enumerate(res)
-
-        ])
-
-        st.dataframe(df, use_container_width=True)
-
-    os.remove(t_path)
+    os.remove(path)
