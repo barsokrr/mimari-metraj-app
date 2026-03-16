@@ -7,15 +7,16 @@ import pandas as pd
 import os
 import numpy as np
 
-# --- 1. TEMA VE CSS ---
+# --- 1. KURUMSAL TEMA VE SAYFA AYARI ---
 st.set_page_config(page_title="Metraj Pro | Barış Öker", layout="wide", page_icon="🏢")
 
+# Kartlardaki metinleri siyah yapan ve karanlık temayı düzenleyen CSS
 st.markdown("""
     <style>
     .stApp { background-color: #0e1117; }
+    /* Metrik kartlarının içindeki metinleri siyah yaparak okunabilirliği artırıyoruz */
     [data-testid="stMetricValue"], [data-testid="stMetricLabel"] {
         color: #000000 !important;
-        font-weight: bold !important;
     }
     div[data-testid="stMetric"] {
         background-color: #ffffff;
@@ -23,7 +24,7 @@ st.markdown("""
         padding: 20px;
         border-radius: 12px;
     }
-    h1, h2, h3, p, span { color: #ffffff !important; }
+    h1, h2, h3, p { color: #ffffff !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -39,12 +40,13 @@ if not st.session_state.logged_in:
         with st.form("login_form"):
             user_input = st.text_input("Kullanıcı", placeholder="Kullanıcı adınızı girin")
             pass_input = st.text_input("Şifre", type="password", placeholder="••••••••")
-            if st.form_submit_button("Sistemi Başlat"):
+            submit_button = st.form_submit_button("Sistemi Başlat")
+            if submit_button:
                 if user_input == "admin" and pass_input == "123":
                     st.session_state.logged_in = True
                     st.rerun()
                 else:
-                    st.error("Hatalı Giriş!")
+                    st.error("Giriş bilgileri hatalı!")
     st.stop()
 
 # --- 3. ANALİZ MOTORU ---
@@ -98,15 +100,18 @@ def autonomous_engine(path, scale, layers):
         return final
     except: return []
 
-# --- 4. ANA PANEL ---
+# --- 4. ANA PANEL VE SIRALAMA ---
 st.sidebar.title("📊 Metraj Kontrol Paneli")
 with st.sidebar:
     st.success("👤 Kullanıcı Adı: Barış Öker")
     dxf_up = st.file_uploader("DXF Dosyası Seçin", type=["dxf"])
+    
+    # Sıralama: Katman > Birim > Yükseklik
     layer_sel = st.text_input("1. Katman (Layer)", "DUVAR")
     unit_sel = st.selectbox("2. Çizim Birimi", ["cm", "mm", "m"], index=0)
-    h_sel = st.number_input("3. Yükseklik (m)", value=2.85)
+    h_sel = st.number_input("3. Yükseklik (m)", value=2.85, step=0.01)
     
+    st.divider()
     if st.button("Güvenli Çıkış"):
         st.session_state.logged_in = False
         st.rerun()
@@ -122,53 +127,47 @@ if dxf_up:
     if res:
         total_l = sum(r['len'] for r in res)
         st.subheader("🚀 Analiz Raporu")
+        
         c1, c2, c3 = st.columns(3)
         c1.metric("Net Uzunluk", f"{round(total_l, 2)} m")
         c2.metric("Toplam Alan", f"{round(total_l * h_sel, 2)} m²")
         c3.metric("Aks Sayısı", len(res))
 
+        # --- YAN YANA GÖRSELLEŞTİRME ---
         st.subheader("🖼️ Analiz Önizleme (Orijinal vs. Aks)")
         v1, v2 = st.columns(2)
         
         with v1:
-            st.markdown("<p style='text-align: center;'>📍 Orijinal Plan (Tam Detaylı)</p>", unsafe_allow_html=True)
-            fig1, ax1 = plt.subplots(figsize=(10, 8), facecolor='#0e1117')
+            st.markdown("<p style='text-align: center;'>📍 Orijinal Çizim (Tüm Plan)</p>", unsafe_allow_html=True)
+            fig1, ax1 = plt.subplots(figsize=(8, 6), facecolor='#0e1117')
             
-            # --- FONT RİSKİ OLMAYAN TAM ÇİZİM DÖNGÜSÜ ---
-            doc = ezdxf.readfile(t_path)
-            msp = doc.modelspace()
-            
-            # Tüm nesneleri çek ve blokları patlatarak çiz
-            for e in msp.query('LINE LWPOLYLINE POLYLINE INSERT ARC CIRCLE'):
-                try:
-                    # Blok ise içindeki objeleri al, değilse kendisini
-                    objs = e.virtual_entities() if e.dxftype() == "INSERT" else [e]
-                    for obj in objs:
-                        if obj.dxftype() == 'LINE':
-                            ax1.plot([obj.dxf.start.x, obj.dxf.end.x], [obj.dxf.start.y, obj.dxf.end.y], color="#454d55", lw=0.5, alpha=0.6)
-                        elif obj.dxftype() in ('LWPOLYLINE', 'POLYLINE'):
-                            pts = list(obj.get_points())
-                            if len(pts) > 1:
-                                ax1.plot([p[0] for p in pts], [p[1] for p in pts], color="#454d55", lw=0.5, alpha=0.6)
-                        elif obj.dxftype() in ('ARC', 'CIRCLE'):
-                            # Tefrişlerdeki kavisler için nokta bulutu (Hızlı render)
-                            ax1.scatter([obj.dxf.center.x], [obj.dxf.center.y], color="#454d55", s=1, alpha=0.4)
-                except:
-                    continue
+            # DOSYAYI FİLTRESİZ OKUYUP ÇİZİYORUZ
+            doc_raw = ezdxf.readfile(t_path)
+            msp_raw = doc_raw.modelspace()
+            # Planda ne varsa (çizgi, poliline vb.) gri tonda çizilir
+            for e in msp_raw.query('LINE LWPOLYLINE POLYLINE'):
+                if e.dxftype() == 'LINE':
+                    ax1.plot([e.dxf.start.x, e.dxf.end.x], [e.dxf.start.y, e.dxf.end.y], color="#576574", lw=0.5, alpha=0.5)
+                elif e.dxftype() in ('LWPOLYLINE', 'POLYLINE'):
+                    pts = list(e.get_points())
+                    for i in range(len(pts)-1):
+                        ax1.plot([pts[i][0], pts[i+1][0]], [pts[i][1], pts[i+1][1]], color="#576574", lw=0.5, alpha=0.5)
             
             ax1.set_aspect("equal"); ax1.axis("off")
             st.pyplot(fig1)
 
         with v2:
             st.markdown("<p style='text-align: center;'>🎯 Analiz Edilen Akslar</p>", unsafe_allow_html=True)
-            fig2, ax2 = plt.subplots(figsize=(10, 8), facecolor='#0e1117')
+            fig2, ax2 = plt.subplots(figsize=(8, 6), facecolor='#0e1117')
             for r in res:
                 p1, p2 = r['path']
+                # Karşılaştırma için koordinatları orijinal scale değerine geri çekiyoruz
                 ax2.plot([p1[0]*sc, p2[0]*sc], [p1[1]*sc, p2[1]*sc], color="#00d2ff", lw=2)
             ax2.set_aspect("equal"); ax2.axis("off")
             st.pyplot(fig2)
         
+        # CETVEL
         st.subheader("📋 Metraj Detay Listesi")
-        df = pd.DataFrame([{"No": i+1, "Metraj (m)": round(r['len'], 2)} for i, r in enumerate(res)])
+        df = pd.DataFrame([{"No": i+1, "Uzunluk (m)": round(r['len'], 2), "Alan (m²)": round(r['len']*h_sel, 2)} for i, r in enumerate(res)])
         st.dataframe(df, use_container_width=True)
     os.remove(t_path)
