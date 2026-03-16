@@ -10,7 +10,6 @@ import numpy as np
 # --- 1. KURUMSAL TEMA VE SAYFA AYARI ---
 st.set_page_config(page_title="Metraj Pro | Barış Öker", layout="wide", page_icon="🏢")
 
-# Metrikleri siyah yaparak okunabilirliği sağlayan CSS
 st.markdown("""
     <style>
     .stApp { background-color: #0e1117; }
@@ -98,7 +97,7 @@ def autonomous_engine(path, scale, layers):
         return final
     except: return []
 
-# --- 4. ANA PANEL VE AYARLAR ---
+# --- 4. ANA PANEL ---
 st.sidebar.title("📊 Metraj Kontrol Paneli")
 with st.sidebar:
     st.success("👤 Kullanıcı Adı: Barış Öker")
@@ -131,24 +130,29 @@ if dxf_up:
         v1, v2 = st.columns(2)
         
         with v1:
-            st.markdown("<p style='text-align: center;'>📍 Orijinal Plan (Tüm Detaylar)</p>", unsafe_allow_html=True)
+            st.markdown("<p style='text-align: center;'>📍 Orijinal Plan (Eksiksiz)</p>", unsafe_allow_html=True)
             fig1, ax1 = plt.subplots(figsize=(10, 8), facecolor='#0e1117')
             
-            # --- TÜM PLANI HİÇBİR DEĞİŞİKLİK YAPMADAN ÇİZEN BÖLÜM ---
+            # --- TÜM PLANI (BLOKLAR DAHİL) ÇİZEN GÜNCEL MANTIK ---
             doc_full = ezdxf.readfile(t_path)
             msp_full = doc_full.modelspace()
-            # Dosyadaki tüm çizgi tabanlı nesneleri katman fark etmeksizin tarar
-            for e in msp_full.query('LINE LWPOLYLINE POLYLINE ARC CIRCLE ELLIPSE SPLINE'):
-                if e.dxftype() == 'LINE':
-                    ax1.plot([e.dxf.start.x, e.dxf.end.x], [e.dxf.start.y, e.dxf.end.y], color="#454d55", lw=0.4, alpha=0.6)
-                elif e.dxftype() in ('LWPOLYLINE', 'POLYLINE'):
-                    pts = list(e.get_points())
-                    for i in range(len(pts)-1):
-                        ax1.plot([pts[i][0], pts[i+1][0]], [pts[i][1], pts[i+1][1]], color="#454d55", lw=0.4, alpha=0.6)
-                # Tefrişlerde sıkça kullanılan daire ve yaylar
-                elif e.dxftype() in ('ARC', 'CIRCLE'):
-                    # Basit bir görselleştirme için merkezden çizer (Ayrıntılı render yerine silüet)
-                    ax1.scatter([e.dxf.center.x], [e.dxf.center.y], color="#454d55", s=1, alpha=0.4)
+            
+            # Tüm nesneleri (Bloklar dahil) tarıyoruz
+            for e in msp_full.query('LINE LWPOLYLINE POLYLINE INSERT ARC CIRCLE'):
+                entities_to_draw = [e]
+                if e.dxftype() == "INSERT":
+                    entities_to_draw = e.virtual_entities()
+                
+                for entity in entities_to_draw:
+                    if entity.dxftype() == 'LINE':
+                        ax1.plot([entity.dxf.start.x, entity.dxf.end.x], [entity.dxf.start.y, entity.dxf.end.y], color="#454d55", lw=0.4, alpha=0.7)
+                    elif entity.dxftype() in ('LWPOLYLINE', 'POLYLINE'):
+                        pts = list(entity.get_points())
+                        for i in range(len(pts)-1):
+                            ax1.plot([pts[i][0], pts[i+1][0]], [pts[i][1], pts[i+1][1]], color="#454d55", lw=0.4, alpha=0.7)
+                    elif entity.dxftype() == 'CIRCLE':
+                        # Daireler için basit bir merkez noktası yerine silüet (tefrişat için)
+                        ax1.scatter([entity.dxf.center.x], [entity.dxf.center.y], color="#454d55", s=0.5, alpha=0.5)
             
             ax1.set_aspect("equal"); ax1.axis("off")
             st.pyplot(fig1)
