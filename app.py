@@ -10,21 +10,18 @@ import numpy as np
 # --- 1. KURUMSAL TEMA VE SAYFA AYARI ---
 st.set_page_config(page_title="Metraj Pro | Barış Öker", layout="wide", page_icon="🏢")
 
+# Kartlardaki metinleri siyah yapan ve karanlık temayı düzenleyen CSS
 st.markdown("""
     <style>
     .stApp { background-color: #0e1117; }
-    div[data-testid="stForm"] {
-        background-color: #161b22;
-        border: 1px solid #30363d;
-        border-radius: 10px;
-        padding: 30px;
-    }
+    /* Metrik kartlarının içindeki metinleri siyah yaparak okunabilirliği artırıyoruz */
     [data-testid="stMetricValue"], [data-testid="stMetricLabel"] {
-        color: #ffffff !important;
+        color: #000000 !important;
     }
     div[data-testid="stMetric"] {
-        background-color: #1f2937;
-        border: 1px solid #374151;
+        background-color: #ffffff;
+        border: 1px solid #dcdde1;
+        padding: 20px;
         border-radius: 12px;
     }
     h1, h2, h3, p { color: #ffffff !important; }
@@ -103,22 +100,15 @@ def autonomous_engine(path, scale, layers):
         return final
     except: return []
 
-# --- 4. ANA PANEL VE YENİ SIRALAMA ---
+# --- 4. ANA PANEL VE SIRALAMA ---
 st.sidebar.title("📊 Metraj Kontrol Paneli")
 with st.sidebar:
-    # 1. KULLANICI ADI GÜNCELLEMESİ
     st.success("👤 Kullanıcı Adı: Barış Öker")
-    
     dxf_up = st.file_uploader("DXF Dosyası Seçin", type=["dxf"])
     
-    # İSTEDİĞİNİZ YENİ SIRALAMA
-    # 1. Sırada Katman (Layer)
+    # Sıralama: Katman > Birim > Yükseklik
     layer_sel = st.text_input("1. Katman (Layer)", "DUVAR")
-    
-    # 2. Sırada Çizim Birimi (Default cm)
     unit_sel = st.selectbox("2. Çizim Birimi", ["cm", "mm", "m"], index=0)
-    
-    # 3. Sırada Yükseklik (Default 2,85)
     h_sel = st.number_input("3. Yükseklik (m)", value=2.85, step=0.01)
     
     st.divider()
@@ -138,24 +128,31 @@ if dxf_up:
         total_l = sum(r['len'] for r in res)
         st.subheader("🚀 Analiz Raporu")
         
-        # OKUNABİLİR METRİKLER
         c1, c2, c3 = st.columns(3)
         c1.metric("Net Uzunluk", f"{round(total_l, 2)} m")
         c2.metric("Toplam Alan", f"{round(total_l * h_sel, 2)} m²")
         c3.metric("Aks Sayısı", len(res))
 
-        # YAN YANA GÖRSELLEŞTİRME
+        # --- YAN YANA GÖRSELLEŞTİRME ---
         st.subheader("🖼️ Analiz Önizleme (Orijinal vs. Aks)")
         v1, v2 = st.columns(2)
         
         with v1:
-            st.markdown("<p style='text-align: center;'>📍 Orijinal Çizim</p>", unsafe_allow_html=True)
+            st.markdown("<p style='text-align: center;'>📍 Orijinal Çizim (Tüm Plan)</p>", unsafe_allow_html=True)
             fig1, ax1 = plt.subplots(figsize=(8, 6), facecolor='#0e1117')
+            
+            # DOSYAYI FİLTRESİZ OKUYUP ÇİZİYORUZ
             doc_raw = ezdxf.readfile(t_path)
-            for e in doc_raw.modelspace().query('LINE LWPOLYLINE'):
-                if layer_sel.upper() in e.dxf.layer.upper():
-                    if e.dxftype() == 'LINE':
-                        ax1.plot([e.dxf.start.x, e.dxf.end.x], [e.dxf.start.y, e.dxf.end.y], color="#576574", lw=1)
+            msp_raw = doc_raw.modelspace()
+            # Planda ne varsa (çizgi, poliline vb.) gri tonda çizilir
+            for e in msp_raw.query('LINE LWPOLYLINE POLYLINE'):
+                if e.dxftype() == 'LINE':
+                    ax1.plot([e.dxf.start.x, e.dxf.end.x], [e.dxf.start.y, e.dxf.end.y], color="#576574", lw=0.5, alpha=0.5)
+                elif e.dxftype() in ('LWPOLYLINE', 'POLYLINE'):
+                    pts = list(e.get_points())
+                    for i in range(len(pts)-1):
+                        ax1.plot([pts[i][0], pts[i+1][0]], [pts[i][1], pts[i+1][1]], color="#576574", lw=0.5, alpha=0.5)
+            
             ax1.set_aspect("equal"); ax1.axis("off")
             st.pyplot(fig1)
 
@@ -164,7 +161,8 @@ if dxf_up:
             fig2, ax2 = plt.subplots(figsize=(8, 6), facecolor='#0e1117')
             for r in res:
                 p1, p2 = r['path']
-                ax2.plot([p1[0], p2[0]], [p1[1], p2[1]], color="#00d2ff", lw=2)
+                # Karşılaştırma için koordinatları orijinal scale değerine geri çekiyoruz
+                ax2.plot([p1[0]*sc, p2[0]*sc], [p1[1]*sc, p2[1]*sc], color="#00d2ff", lw=2)
             ax2.set_aspect("equal"); ax2.axis("off")
             st.pyplot(fig2)
         
