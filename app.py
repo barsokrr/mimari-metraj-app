@@ -126,7 +126,7 @@ if dxf_up:
 
     if res:
         total_l = sum(r['len'] for r in res)
-        st.subheader("🚀 Analiz Raporu")
+        st.subheader("Analiz Raporu")
         
         c1, c2, c3 = st.columns(3)
         c1.metric("Net Uzunluk", f"{round(total_l, 2)} m")
@@ -134,11 +134,11 @@ if dxf_up:
         c3.metric("Aks Sayısı", len(res))
 
         # --- YAN YANA GÖRSELLEŞTİRME ---
-        st.subheader("🖼️ Analiz Önizleme ")
+        st.subheader("Analiz Önizleme ")
         v1, v2 = st.columns(2)
         
         with v1:
-            st.markdown("<p style='text-align: center;'>📍 Orijinal Çizim</p>", unsafe_allow_html=True)
+            st.markdown("<p style='text-align: center;'> Orijinal Çizim</p>", unsafe_allow_html=True)
             fig1, ax1 = plt.subplots(figsize=(8, 6), facecolor='#0e1117')
             
             # DOSYAYI FİLTRESİZ OKUYUP ÇİZİYORUZ
@@ -157,7 +157,7 @@ if dxf_up:
             st.pyplot(fig1)
 
         with v2:
-            st.markdown("<p style='text-align: center;'>🎯 Analiz Edilen Akslar</p>", unsafe_allow_html=True)
+            st.markdown("<p style='text-align: center;'> Analiz Edilen Akslar</p>", unsafe_allow_html=True)
             fig2, ax2 = plt.subplots(figsize=(8, 6), facecolor='#0e1117')
             for r in res:
                 p1, p2 = r['path']
