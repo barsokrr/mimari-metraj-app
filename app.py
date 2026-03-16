@@ -6,33 +6,23 @@ import math
 import pandas as pd
 import os
 import numpy as np
-from io import BytesIO
 
-# --- 1. KURUMSAL TEMA VE AGRESİF CSS ---
+# --- 1. TEMA VE CSS ---
 st.set_page_config(page_title="Metraj Pro | Barış Öker", layout="wide", page_icon="🏢")
 
 st.markdown("""
     <style>
     .stApp { background-color: #0e1117; }
-    
-    /* Beyaz kutu içindeki yazıların görünmeme sorununu çözen ana kısım */
-    [data-testid="stMetric"] {
-        background-color: #FFFFFF !important;
-        border: 2px solid #FFFFFF;
-        padding: 15px;
-        border-radius: 10px;
-    }
-
-    /* Tüm metrik yazılarını (etiket ve değer) siyaha zorla */
-    [data-testid="stMetricValue"] > div, 
-    [data-testid="stMetricLabel"] > div,
-    [data-testid="stMetric"] label,
-    [data-testid="stMetric"] div {
+    [data-testid="stMetricValue"], [data-testid="stMetricLabel"] {
         color: #000000 !important;
-        -webkit-text-fill-color: #000000 !important;
         font-weight: bold !important;
     }
-
+    div[data-testid="stMetric"] {
+        background-color: #ffffff;
+        border: 1px solid #dcdde1;
+        padding: 20px;
+        border-radius: 12px;
+    }
     h1, h2, h3, p, span { color: #ffffff !important; }
     </style>
     """, unsafe_allow_html=True)
@@ -40,7 +30,7 @@ st.markdown("""
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
-# --- 2. GİRİŞ KONTROLÜ ---
+# --- 2. GİRİŞ EKRANI ---
 if not st.session_state.logged_in:
     _, col_mid, _ = st.columns([1, 1.2, 1])
     with col_mid:
@@ -54,7 +44,7 @@ if not st.session_state.logged_in:
                     st.session_state.logged_in = True
                     st.rerun()
                 else:
-                    st.error("Giriş bilgileri hatalı!")
+                    st.error("Hatalı Giriş!")
     st.stop()
 
 # --- 3. ANALİZ MOTORU ---
@@ -115,9 +105,8 @@ with st.sidebar:
     dxf_up = st.file_uploader("DXF Dosyası Seçin", type=["dxf"])
     layer_sel = st.text_input("1. Katman (Layer)", "DUVAR")
     unit_sel = st.selectbox("2. Çizim Birimi", ["cm", "mm", "m"], index=0)
-    h_sel = st.number_input("3. Yükseklik (m)", value=2.85, step=0.01)
+    h_sel = st.number_input("3. Yükseklik (m)", value=2.85)
     
-    st.divider()
     if st.button("Güvenli Çıkış"):
         st.session_state.logged_in = False
         st.rerun()
@@ -133,27 +122,45 @@ if dxf_up:
     if res:
         total_l = sum(r['len'] for r in res)
         st.subheader("🚀 Analiz Raporu")
-        
         c1, c2, c3 = st.columns(3)
-        # Veriler burada oluşturuluyor
         c1.metric("Net Uzunluk", f"{round(total_l, 2)} m")
         c2.metric("Toplam Alan", f"{round(total_l * h_sel, 2)} m²")
         c3.metric("Aks Sayısı", len(res))
 
-        st.divider()
-        st.subheader("🖼️ Analiz Önizleme")
+        st.subheader("🖼️ Analiz Önizleme (Orijinal vs. Aks)")
         v1, v2 = st.columns(2)
         
-        # Grafik bölümleri (v1 ve v2) aynı kaldı...
         with v1:
-            st.write("📍 Orijinal Plan (Tüm Detaylar)")
+            st.markdown("<p style='text-align: center;'>📍 Orijinal Plan (Tam Detaylı)</p>", unsafe_allow_html=True)
             fig1, ax1 = plt.subplots(figsize=(10, 8), facecolor='#0e1117')
-            # ... (ezdxf render işlemleri)
+            
+            # --- FONT RİSKİ OLMAYAN TAM ÇİZİM DÖNGÜSÜ ---
+            doc = ezdxf.readfile(t_path)
+            msp = doc.modelspace()
+            
+            # Tüm nesneleri çek ve blokları patlatarak çiz
+            for e in msp.query('LINE LWPOLYLINE POLYLINE INSERT ARC CIRCLE'):
+                try:
+                    # Blok ise içindeki objeleri al, değilse kendisini
+                    objs = e.virtual_entities() if e.dxftype() == "INSERT" else [e]
+                    for obj in objs:
+                        if obj.dxftype() == 'LINE':
+                            ax1.plot([obj.dxf.start.x, obj.dxf.end.x], [obj.dxf.start.y, obj.dxf.end.y], color="#454d55", lw=0.5, alpha=0.6)
+                        elif obj.dxftype() in ('LWPOLYLINE', 'POLYLINE'):
+                            pts = list(obj.get_points())
+                            if len(pts) > 1:
+                                ax1.plot([p[0] for p in pts], [p[1] for p in pts], color="#454d55", lw=0.5, alpha=0.6)
+                        elif obj.dxftype() in ('ARC', 'CIRCLE'):
+                            # Tefrişlerdeki kavisler için nokta bulutu (Hızlı render)
+                            ax1.scatter([obj.dxf.center.x], [obj.dxf.center.y], color="#454d55", s=1, alpha=0.4)
+                except:
+                    continue
+            
             ax1.set_aspect("equal"); ax1.axis("off")
             st.pyplot(fig1)
 
         with v2:
-            st.write("🎯 Analiz Edilen Akslar")
+            st.markdown("<p style='text-align: center;'>🎯 Analiz Edilen Akslar</p>", unsafe_allow_html=True)
             fig2, ax2 = plt.subplots(figsize=(10, 8), facecolor='#0e1117')
             for r in res:
                 p1, p2 = r['path']
@@ -162,22 +169,6 @@ if dxf_up:
             st.pyplot(fig2)
         
         st.subheader("📋 Metraj Detay Listesi")
-        df_data = [{"No": i+1, "Uzunluk (m)": round(r['len'], 2), "Alan (m²)": round(r['len']*h_sel, 2)} for i, r in enumerate(res)]
-        df = pd.DataFrame(df_data)
+        df = pd.DataFrame([{"No": i+1, "Metraj (m)": round(r['len'], 2)} for i, r in enumerate(res)])
         st.dataframe(df, use_container_width=True)
-
-        # EXCEL DÜZELTME: engine='openpyxl' kullanımı daha güvenlidir
-        output = BytesIO()
-        try:
-            df.to_excel(output, index=False, engine='openpyxl')
-            excel_data = output.getvalue()
-            st.download_button(
-                label="📊 Metraj Listesini Excel Olarak İndir",
-                data=excel_data,
-                file_name=f"Metraj_Raporu_{dxf_up.name}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
-        except Exception as e:
-            st.error(f"Excel oluşturulurken bir hata oluştu: {e}")
-        
     os.remove(t_path)
