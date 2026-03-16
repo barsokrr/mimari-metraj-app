@@ -1,6 +1,5 @@
 import streamlit as st
 import ezdxf
-from ezdxf.addons.drawing import Frontend, RenderContext, matplotlib
 import matplotlib.pyplot as plt
 import tempfile
 import math
@@ -8,7 +7,7 @@ import pandas as pd
 import os
 import numpy as np
 
-# --- 1. KURUMSAL TEMA VE SAYFA AYARI ---
+# --- 1. TEMA VE CSS ---
 st.set_page_config(page_title="Metraj Pro | Barış Öker", layout="wide", page_icon="🏢")
 
 st.markdown("""
@@ -77,7 +76,7 @@ def autonomous_engine(path, scale, layers):
             elif e.dxftype() in ("LWPOLYLINE", "POLYLINE"):
                 pts = list(e.get_points())
                 for i in range(len(pts)-1):
-                    temp_pts.append(((pts[i][0], pts[i+1][0]), (pts[i][1], pts[i+1][1])))
+                    temp_pts.append(((pts[i][0], pts[i][1]), (pts[i+1][0], pts[i+1][1])))
 
             for s in temp_pts:
                 p1, p2 = (s[0][0]/scale, s[0][1]/scale), (s[1][0]/scale, s[1][1]/scale)
@@ -133,21 +132,32 @@ if dxf_up:
         
         with v1:
             st.markdown("<p style='text-align: center;'>📍 Orijinal Plan (Tam Detaylı)</p>", unsafe_allow_html=True)
-            try:
-                # --- YENİ ÇİZİM YÖNTEMİ: FRONTEND RENDER ---
-                doc = ezdxf.readfile(t_path)
-                msp = doc.modelspace()
-                fig1 = plt.figure(figsize=(10, 8), facecolor='#0e1117')
-                ax1 = fig1.add_subplot(1, 1, 1)
-                
-                ctx = RenderContext(doc)
-                out = matplotlib.MatplotlibBackend(ax1)
-                Frontend(ctx, out).draw_layout(msp, finalize=True)
-                
-                ax1.set_aspect("equal"); ax1.axis("off")
-                st.pyplot(fig1)
-            except Exception as e:
-                st.error(f"Plan çizilemedi: {e}")
+            fig1, ax1 = plt.subplots(figsize=(10, 8), facecolor='#0e1117')
+            
+            # --- FONT RİSKİ OLMAYAN TAM ÇİZİM DÖNGÜSÜ ---
+            doc = ezdxf.readfile(t_path)
+            msp = doc.modelspace()
+            
+            # Tüm nesneleri çek ve blokları patlatarak çiz
+            for e in msp.query('LINE LWPOLYLINE POLYLINE INSERT ARC CIRCLE'):
+                try:
+                    # Blok ise içindeki objeleri al, değilse kendisini
+                    objs = e.virtual_entities() if e.dxftype() == "INSERT" else [e]
+                    for obj in objs:
+                        if obj.dxftype() == 'LINE':
+                            ax1.plot([obj.dxf.start.x, obj.dxf.end.x], [obj.dxf.start.y, obj.dxf.end.y], color="#454d55", lw=0.5, alpha=0.6)
+                        elif obj.dxftype() in ('LWPOLYLINE', 'POLYLINE'):
+                            pts = list(obj.get_points())
+                            if len(pts) > 1:
+                                ax1.plot([p[0] for p in pts], [p[1] for p in pts], color="#454d55", lw=0.5, alpha=0.6)
+                        elif obj.dxftype() in ('ARC', 'CIRCLE'):
+                            # Tefrişlerdeki kavisler için nokta bulutu (Hızlı render)
+                            ax1.scatter([obj.dxf.center.x], [obj.dxf.center.y], color="#454d55", s=1, alpha=0.4)
+                except:
+                    continue
+            
+            ax1.set_aspect("equal"); ax1.axis("off")
+            st.pyplot(fig1)
 
         with v2:
             st.markdown("<p style='text-align: center;'>🎯 Analiz Edilen Akslar</p>", unsafe_allow_html=True)
