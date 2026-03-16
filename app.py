@@ -8,23 +8,17 @@ import os
 import numpy as np
 
 # --- 1. KURUMSAL TEMA VE SAYFA AYARI ---
-st.set_page_config(page_title="Metraj Pro | Giriş", layout="wide", page_icon="🏢")
+st.set_page_config(page_title="Metraj Pro | Barış Öker", layout="wide", page_icon="🏢")
 
-# Görseldeki siyah/karanlık temayı ve metin renklerini sabitleyen CSS
 st.markdown("""
     <style>
-    /* Ana Arka Plan */
     .stApp { background-color: #0e1117; }
-    
-    /* Giriş Kutusu ve Form Elemanları */
     div[data-testid="stForm"] {
         background-color: #161b22;
         border: 1px solid #30363d;
         border-radius: 10px;
         padding: 30px;
     }
-    
-    /* Metin ve Metrik Renkleri - Okunabilirlik için Siyah/Koyu Gri kartlar beyaz metin */
     [data-testid="stMetricValue"], [data-testid="stMetricLabel"] {
         color: #ffffff !important;
     }
@@ -33,8 +27,6 @@ st.markdown("""
         border: 1px solid #374151;
         border-radius: 12px;
     }
-    
-    /* Başlıklar */
     h1, h2, h3, p { color: #ffffff !important; }
     </style>
     """, unsafe_allow_html=True)
@@ -42,31 +34,25 @@ st.markdown("""
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
-# --- 2. GİRİŞ EKRANI (GÖRSELDEKİ ARAYÜZ) ---
+# --- 2. GİRİŞ EKRANI ---
 if not st.session_state.logged_in:
-    # Sayfayı ortalamak için sütun yapısı
     _, col_mid, _ = st.columns([1, 1.2, 1])
-    
     with col_mid:
         st.markdown("<br><br>", unsafe_allow_html=True)
         st.title("🏢 Metraj Pro Giriş")
-        
         with st.form("login_form"):
             user_input = st.text_input("Kullanıcı", placeholder="Kullanıcı adınızı girin")
             pass_input = st.text_input("Şifre", type="password", placeholder="••••••••")
-            
-            # Görseldeki "Sistemi Başlat" butonu
             submit_button = st.form_submit_button("Sistemi Başlat")
-            
             if submit_button:
                 if user_input == "admin" and pass_input == "123":
                     st.session_state.logged_in = True
                     st.rerun()
                 else:
-                    st.error("Giriş bilgileri hatalı. Lütfen kontrol edin.")
+                    st.error("Giriş bilgileri hatalı!")
     st.stop()
 
-# --- 3. ANALİZ MOTORU VE ANA UYGULAMA (Giriş Sonrası) ---
+# --- 3. ANALİZ MOTORU ---
 def get_p2l_dist(p, line):
     p1, p2 = np.array(line[0]), np.array(line[1])
     p3 = np.array(p)
@@ -74,7 +60,6 @@ def get_p2l_dist(p, line):
     return np.abs(np.cross(p2-p1, p1-p3)) / np.linalg.norm(p2-p1)
 
 def autonomous_engine(path, scale, layers):
-    # Arka planda çalışan mühendislik kabulleri
     MIN_L = 0.25 
     GAP_TOL = 0.35 
     try:
@@ -118,14 +103,25 @@ def autonomous_engine(path, scale, layers):
         return final
     except: return []
 
-# --- 4. ANA PANEL ---
+# --- 4. ANA PANEL VE YENİ SIRALAMA ---
 st.sidebar.title("📊 Metraj Kontrol Paneli")
 with st.sidebar:
-    st.success("Oturum Aktif: BARIŞ")
+    # 1. KULLANICI ADI GÜNCELLEMESİ
+    st.success("👤 Kullanıcı Adı: Barış Öker")
+    
     dxf_up = st.file_uploader("DXF Dosyası Seçin", type=["dxf"])
-    unit_sel = st.selectbox("Çizim Birimi", ["cm", "mm", "m"])
-    layer_sel = st.text_input("Layer (Katman)", "DUVAR")
-    h_sel = st.number_input("Yükseklik (m)", value=2.85)
+    
+    # İSTEDİĞİNİZ YENİ SIRALAMA
+    # 1. Sırada Katman (Layer)
+    layer_sel = st.text_input("1. Katman (Layer)", "DUVAR")
+    
+    # 2. Sırada Çizim Birimi (Default cm)
+    unit_sel = st.selectbox("2. Çizim Birimi", ["cm", "mm", "m"], index=0)
+    
+    # 3. Sırada Yükseklik (Default 2,85)
+    h_sel = st.number_input("3. Yükseklik (m)", value=2.85, step=0.01)
+    
+    st.divider()
     if st.button("Güvenli Çıkış"):
         st.session_state.logged_in = False
         st.rerun()
@@ -141,19 +137,39 @@ if dxf_up:
     if res:
         total_l = sum(r['len'] for r in res)
         st.subheader("🚀 Analiz Raporu")
+        
+        # OKUNABİLİR METRİKLER
         c1, c2, c3 = st.columns(3)
         c1.metric("Net Uzunluk", f"{round(total_l, 2)} m")
         c2.metric("Toplam Alan", f"{round(total_l * h_sel, 2)} m²")
         c3.metric("Aks Sayısı", len(res))
 
-        fig, ax = plt.subplots(figsize=(10, 4), facecolor='#0e1117')
-        for r in res:
-            p1, p2 = r['path']
-            ax.plot([p1[0], p2[0]], [p1[1], p2[1]], color="#00d2ff", lw=2)
-        ax.set_aspect("equal"); ax.axis("off")
-        st.pyplot(fig)
+        # YAN YANA GÖRSELLEŞTİRME
+        st.subheader("🖼️ Analiz Önizleme (Orijinal vs. Aks)")
+        v1, v2 = st.columns(2)
         
-        df = pd.DataFrame([{"No": i+1, "Metraj (m)": round(r['len'], 2)} for i, r in enumerate(res)])
+        with v1:
+            st.markdown("<p style='text-align: center;'>📍 Orijinal Çizim</p>", unsafe_allow_html=True)
+            fig1, ax1 = plt.subplots(figsize=(8, 6), facecolor='#0e1117')
+            doc_raw = ezdxf.readfile(t_path)
+            for e in doc_raw.modelspace().query('LINE LWPOLYLINE'):
+                if layer_sel.upper() in e.dxf.layer.upper():
+                    if e.dxftype() == 'LINE':
+                        ax1.plot([e.dxf.start.x, e.dxf.end.x], [e.dxf.start.y, e.dxf.end.y], color="#576574", lw=1)
+            ax1.set_aspect("equal"); ax1.axis("off")
+            st.pyplot(fig1)
+
+        with v2:
+            st.markdown("<p style='text-align: center;'>🎯 Analiz Edilen Akslar</p>", unsafe_allow_html=True)
+            fig2, ax2 = plt.subplots(figsize=(8, 6), facecolor='#0e1117')
+            for r in res:
+                p1, p2 = r['path']
+                ax2.plot([p1[0], p2[0]], [p1[1], p2[1]], color="#00d2ff", lw=2)
+            ax2.set_aspect("equal"); ax2.axis("off")
+            st.pyplot(fig2)
+        
+        # CETVEL
+        st.subheader("📋 Metraj Detay Listesi")
+        df = pd.DataFrame([{"No": i+1, "Uzunluk (m)": round(r['len'], 2), "Alan (m²)": round(r['len']*h_sel, 2)} for i, r in enumerate(res)])
         st.dataframe(df, use_container_width=True)
-        st.download_button("Excel İndir", df.to_csv().encode('utf-8'), "metraj.csv")
     os.remove(t_path)
