@@ -1,5 +1,6 @@
 import streamlit as st
 import ezdxf
+from ezdxf.addons.drawing import Frontend, RenderContext, matplotlib
 import matplotlib.pyplot as plt
 import tempfile
 import math
@@ -15,6 +16,7 @@ st.markdown("""
     .stApp { background-color: #0e1117; }
     [data-testid="stMetricValue"], [data-testid="stMetricLabel"] {
         color: #000000 !important;
+        font-weight: bold !important;
     }
     div[data-testid="stMetric"] {
         background-color: #ffffff;
@@ -22,7 +24,7 @@ st.markdown("""
         padding: 20px;
         border-radius: 12px;
     }
-    h1, h2, h3, p { color: #ffffff !important; }
+    h1, h2, h3, p, span { color: #ffffff !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -75,7 +77,7 @@ def autonomous_engine(path, scale, layers):
             elif e.dxftype() in ("LWPOLYLINE", "POLYLINE"):
                 pts = list(e.get_points())
                 for i in range(len(pts)-1):
-                    temp_pts.append(((pts[i][0], pts[i][1]), (pts[i+1][0], pts[i+1][1])))
+                    temp_pts.append(((pts[i][0], pts[i+1][0]), (pts[i][1], pts[i+1][1])))
 
             for s in temp_pts:
                 p1, p2 = (s[0][0]/scale, s[0][1]/scale), (s[1][0]/scale, s[1][1]/scale)
@@ -130,44 +132,28 @@ if dxf_up:
         v1, v2 = st.columns(2)
         
         with v1:
-            st.markdown("<p style='text-align: center;'>📍 Orijinal Plan (Eksiksiz)</p>", unsafe_allow_html=True)
-            fig1, ax1 = plt.subplots(figsize=(10, 8), facecolor='#0e1117')
-            
-            # --- HATASIZ ÇİZİM İÇİN TÜM NESNELERİ TARAYAN DÖNGÜ ---
-            doc_full = ezdxf.readfile(t_path)
-            msp_full = doc_full.modelspace()
-            
-            # Tüm nesneleri çekiyoruz
-            all_entities = msp_full.query('LINE LWPOLYLINE POLYLINE ARC CIRCLE INSERT')
-            
-            for e in all_entities:
-                # Blokları (INSERT) patlatıp içindeki çizgileri alıyoruz
-                drawn_objs = e.virtual_entities() if e.dxftype() == "INSERT" else [e]
+            st.markdown("<p style='text-align: center;'>📍 Orijinal Plan (Tam Detaylı)</p>", unsafe_allow_html=True)
+            try:
+                # --- YENİ ÇİZİM YÖNTEMİ: FRONTEND RENDER ---
+                doc = ezdxf.readfile(t_path)
+                msp = doc.modelspace()
+                fig1 = plt.figure(figsize=(10, 8), facecolor='#0e1117')
+                ax1 = fig1.add_subplot(1, 1, 1)
                 
-                for obj in drawn_objs:
-                    try:
-                        if obj.dxftype() == 'LINE':
-                            ax1.plot([obj.dxf.start.x, obj.dxf.end.x], [obj.dxf.start.y, obj.dxf.end.y], color="#454d55", lw=0.4, alpha=0.7)
-                        elif obj.dxftype() in ('LWPOLYLINE', 'POLYLINE'):
-                            pts = list(obj.get_points())
-                            if len(pts) > 1:
-                                x_pts = [p[0] for p in pts]
-                                y_pts = [p[1] for p in pts]
-                                ax1.plot(x_pts, y_pts, color="#454d55", lw=0.4, alpha=0.7)
-                        elif obj.dxftype() in ('ARC', 'CIRCLE'):
-                            ax1.scatter([obj.dxf.center.x], [obj.dxf.center.y], color="#454d55", s=0.5, alpha=0.5)
-                    except:
-                        continue
-            
-            ax1.set_aspect("equal"); ax1.axis("off")
-            st.pyplot(fig1)
+                ctx = RenderContext(doc)
+                out = matplotlib.MatplotlibBackend(ax1)
+                Frontend(ctx, out).draw_layout(msp, finalize=True)
+                
+                ax1.set_aspect("equal"); ax1.axis("off")
+                st.pyplot(fig1)
+            except Exception as e:
+                st.error(f"Plan çizilemedi: {e}")
 
         with v2:
             st.markdown("<p style='text-align: center;'>🎯 Analiz Edilen Akslar</p>", unsafe_allow_html=True)
             fig2, ax2 = plt.subplots(figsize=(10, 8), facecolor='#0e1117')
             for r in res:
                 p1, p2 = r['path']
-                # Analiz akslarını orijinal koordinatlara (sc ile çarparak) geri getiriyoruz
                 ax2.plot([p1[0]*sc, p2[0]*sc], [p1[1]*sc, p2[1]*sc], color="#00d2ff", lw=2)
             ax2.set_aspect("equal"); ax2.axis("off")
             st.pyplot(fig2)
