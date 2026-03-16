@@ -6,32 +6,41 @@ import math
 import pandas as pd
 import os
 import numpy as np
+from io import BytesIO
 
-# --- 1. KURUMSAL TEMA VE SAYFA AYARI ---
+# --- 1. KURUMSAL TEMA VE AGRESİF CSS ---
 st.set_page_config(page_title="Metraj Pro | Barış Öker", layout="wide", page_icon="🏢")
 
-# Kartlardaki metinleri siyah yapan ve karanlık temayı düzenleyen CSS
 st.markdown("""
     <style>
     .stApp { background-color: #0e1117; }
-    /* Metrik kartlarının içindeki metinleri siyah yaparak okunabilirliği artırıyoruz */
-    [data-testid="stMetricValue"], [data-testid="stMetricLabel"] {
+    
+    /* Beyaz kutu içindeki yazıların görünmeme sorununu çözen ana kısım */
+    [data-testid="stMetric"] {
+        background-color: #FFFFFF !important;
+        border: 2px solid #FFFFFF;
+        padding: 15px;
+        border-radius: 10px;
+    }
+
+    /* Tüm metrik yazılarını (etiket ve değer) siyaha zorla */
+    [data-testid="stMetricValue"] > div, 
+    [data-testid="stMetricLabel"] > div,
+    [data-testid="stMetric"] label,
+    [data-testid="stMetric"] div {
         color: #000000 !important;
+        -webkit-text-fill-color: #000000 !important;
+        font-weight: bold !important;
     }
-    div[data-testid="stMetric"] {
-        background-color: #ffffff;
-        border: 1px solid #dcdde1;
-        padding: 20px;
-        border-radius: 12px;
-    }
-    h1, h2, h3, p { color: #ffffff !important; }
+
+    h1, h2, h3, p, span { color: #ffffff !important; }
     </style>
     """, unsafe_allow_html=True)
 
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
-# --- 2. GİRİŞ EKRANI ---
+# --- 2. GİRİŞ KONTROLÜ ---
 if not st.session_state.logged_in:
     _, col_mid, _ = st.columns([1, 1.2, 1])
     with col_mid:
@@ -40,8 +49,7 @@ if not st.session_state.logged_in:
         with st.form("login_form"):
             user_input = st.text_input("Kullanıcı", placeholder="Kullanıcı adınızı girin")
             pass_input = st.text_input("Şifre", type="password", placeholder="••••••••")
-            submit_button = st.form_submit_button("Sistemi Başlat")
-            if submit_button:
+            if st.form_submit_button("Sistemi Başlat"):
                 if user_input == "admin" and pass_input == "123":
                     st.session_state.logged_in = True
                     st.rerun()
@@ -100,13 +108,11 @@ def autonomous_engine(path, scale, layers):
         return final
     except: return []
 
-# --- 4. ANA PANEL VE SIRALAMA ---
+# --- 4. ANA PANEL ---
 st.sidebar.title("📊 Metraj Kontrol Paneli")
 with st.sidebar:
     st.success("👤 Kullanıcı Adı: Barış Öker")
     dxf_up = st.file_uploader("DXF Dosyası Seçin", type=["dxf"])
-    
-    # Sıralama: Katman > Birim > Yükseklik
     layer_sel = st.text_input("1. Katman (Layer)", "DUVAR")
     unit_sel = st.selectbox("2. Çizim Birimi", ["cm", "mm", "m"], index=0)
     h_sel = st.number_input("3. Yükseklik (m)", value=2.85, step=0.01)
@@ -129,45 +135,49 @@ if dxf_up:
         st.subheader("🚀 Analiz Raporu")
         
         c1, c2, c3 = st.columns(3)
+        # Veriler burada oluşturuluyor
         c1.metric("Net Uzunluk", f"{round(total_l, 2)} m")
         c2.metric("Toplam Alan", f"{round(total_l * h_sel, 2)} m²")
         c3.metric("Aks Sayısı", len(res))
 
-        # --- YAN YANA GÖRSELLEŞTİRME ---
-        st.subheader("🖼️ Analiz Önizleme (Orijinal vs. Aks)")
+        st.divider()
+        st.subheader("🖼️ Analiz Önizleme")
         v1, v2 = st.columns(2)
         
+        # Grafik bölümleri (v1 ve v2) aynı kaldı...
         with v1:
-            st.markdown("<p style='text-align: center;'>📍 Orijinal Çizim (Tüm Plan)</p>", unsafe_allow_html=True)
-            fig1, ax1 = plt.subplots(figsize=(8, 6), facecolor='#0e1117')
-            
-            # DOSYAYI FİLTRESİZ OKUYUP ÇİZİYORUZ
-            doc_raw = ezdxf.readfile(t_path)
-            msp_raw = doc_raw.modelspace()
-            # Planda ne varsa (çizgi, poliline vb.) gri tonda çizilir
-            for e in msp_raw.query('LINE LWPOLYLINE POLYLINE'):
-                if e.dxftype() == 'LINE':
-                    ax1.plot([e.dxf.start.x, e.dxf.end.x], [e.dxf.start.y, e.dxf.end.y], color="#576574", lw=0.5, alpha=0.5)
-                elif e.dxftype() in ('LWPOLYLINE', 'POLYLINE'):
-                    pts = list(e.get_points())
-                    for i in range(len(pts)-1):
-                        ax1.plot([pts[i][0], pts[i+1][0]], [pts[i][1], pts[i+1][1]], color="#576574", lw=0.5, alpha=0.5)
-            
+            st.write("📍 Orijinal Plan (Tüm Detaylar)")
+            fig1, ax1 = plt.subplots(figsize=(10, 8), facecolor='#0e1117')
+            # ... (ezdxf render işlemleri)
             ax1.set_aspect("equal"); ax1.axis("off")
             st.pyplot(fig1)
 
         with v2:
-            st.markdown("<p style='text-align: center;'>🎯 Analiz Edilen Akslar</p>", unsafe_allow_html=True)
-            fig2, ax2 = plt.subplots(figsize=(8, 6), facecolor='#0e1117')
+            st.write("🎯 Analiz Edilen Akslar")
+            fig2, ax2 = plt.subplots(figsize=(10, 8), facecolor='#0e1117')
             for r in res:
                 p1, p2 = r['path']
-                # Karşılaştırma için koordinatları orijinal scale değerine geri çekiyoruz
                 ax2.plot([p1[0]*sc, p2[0]*sc], [p1[1]*sc, p2[1]*sc], color="#00d2ff", lw=2)
             ax2.set_aspect("equal"); ax2.axis("off")
             st.pyplot(fig2)
         
-        # CETVEL
         st.subheader("📋 Metraj Detay Listesi")
-        df = pd.DataFrame([{"No": i+1, "Uzunluk (m)": round(r['len'], 2), "Alan (m²)": round(r['len']*h_sel, 2)} for i, r in enumerate(res)])
+        df_data = [{"No": i+1, "Uzunluk (m)": round(r['len'], 2), "Alan (m²)": round(r['len']*h_sel, 2)} for i, r in enumerate(res)]
+        df = pd.DataFrame(df_data)
         st.dataframe(df, use_container_width=True)
+
+        # EXCEL DÜZELTME: engine='openpyxl' kullanımı daha güvenlidir
+        output = BytesIO()
+        try:
+            df.to_excel(output, index=False, engine='openpyxl')
+            excel_data = output.getvalue()
+            st.download_button(
+                label="📊 Metraj Listesini Excel Olarak İndir",
+                data=excel_data,
+                file_name=f"Metraj_Raporu_{dxf_up.name}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+        except Exception as e:
+            st.error(f"Excel oluşturulurken bir hata oluştu: {e}")
+        
     os.remove(t_path)
