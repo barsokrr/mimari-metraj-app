@@ -133,26 +133,31 @@ if dxf_up:
             st.markdown("<p style='text-align: center;'>📍 Orijinal Plan (Eksiksiz)</p>", unsafe_allow_html=True)
             fig1, ax1 = plt.subplots(figsize=(10, 8), facecolor='#0e1117')
             
-            # --- TÜM PLANI (BLOKLAR DAHİL) ÇİZEN GÜNCEL MANTIK ---
+            # --- HATASIZ ÇİZİM İÇİN TÜM NESNELERİ TARAYAN DÖNGÜ ---
             doc_full = ezdxf.readfile(t_path)
             msp_full = doc_full.modelspace()
             
-            # Tüm nesneleri (Bloklar dahil) tarıyoruz
-            for e in msp_full.query('LINE LWPOLYLINE POLYLINE INSERT ARC CIRCLE'):
-                entities_to_draw = [e]
-                if e.dxftype() == "INSERT":
-                    entities_to_draw = e.virtual_entities()
+            # Tüm nesneleri çekiyoruz
+            all_entities = msp_full.query('LINE LWPOLYLINE POLYLINE ARC CIRCLE INSERT')
+            
+            for e in all_entities:
+                # Blokları (INSERT) patlatıp içindeki çizgileri alıyoruz
+                drawn_objs = e.virtual_entities() if e.dxftype() == "INSERT" else [e]
                 
-                for entity in entities_to_draw:
-                    if entity.dxftype() == 'LINE':
-                        ax1.plot([entity.dxf.start.x, entity.dxf.end.x], [entity.dxf.start.y, entity.dxf.end.y], color="#454d55", lw=0.4, alpha=0.7)
-                    elif entity.dxftype() in ('LWPOLYLINE', 'POLYLINE'):
-                        pts = list(entity.get_points())
-                        for i in range(len(pts)-1):
-                            ax1.plot([pts[i][0], pts[i+1][0]], [pts[i][1], pts[i+1][1]], color="#454d55", lw=0.4, alpha=0.7)
-                    elif entity.dxftype() == 'CIRCLE':
-                        # Daireler için basit bir merkez noktası yerine silüet (tefrişat için)
-                        ax1.scatter([entity.dxf.center.x], [entity.dxf.center.y], color="#454d55", s=0.5, alpha=0.5)
+                for obj in drawn_objs:
+                    try:
+                        if obj.dxftype() == 'LINE':
+                            ax1.plot([obj.dxf.start.x, obj.dxf.end.x], [obj.dxf.start.y, obj.dxf.end.y], color="#454d55", lw=0.4, alpha=0.7)
+                        elif obj.dxftype() in ('LWPOLYLINE', 'POLYLINE'):
+                            pts = list(obj.get_points())
+                            if len(pts) > 1:
+                                x_pts = [p[0] for p in pts]
+                                y_pts = [p[1] for p in pts]
+                                ax1.plot(x_pts, y_pts, color="#454d55", lw=0.4, alpha=0.7)
+                        elif obj.dxftype() in ('ARC', 'CIRCLE'):
+                            ax1.scatter([obj.dxf.center.x], [obj.dxf.center.y], color="#454d55", s=0.5, alpha=0.5)
+                    except:
+                        continue
             
             ax1.set_aspect("equal"); ax1.axis("off")
             st.pyplot(fig1)
@@ -162,6 +167,7 @@ if dxf_up:
             fig2, ax2 = plt.subplots(figsize=(10, 8), facecolor='#0e1117')
             for r in res:
                 p1, p2 = r['path']
+                # Analiz akslarını orijinal koordinatlara (sc ile çarparak) geri getiriyoruz
                 ax2.plot([p1[0]*sc, p2[0]*sc], [p1[1]*sc, p2[1]*sc], color="#00d2ff", lw=2)
             ax2.set_aspect("equal"); ax2.axis("off")
             st.pyplot(fig2)
