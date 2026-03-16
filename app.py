@@ -134,11 +134,11 @@ if dxf_up:
         c3.metric("Aks Sayısı", len(res))
 
         # --- YAN YANA GÖRSELLEŞTİRME ---
-        st.subheader("🖼️ Analiz Önizleme (Orijinal vs. Aks)")
+        st.subheader("🖼️ Analiz Önizleme ")
         v1, v2 = st.columns(2)
         
         with v1:
-            st.markdown("<p style='text-align: center;'>📍 Orijinal Çizim (Tüm Plan)</p>", unsafe_allow_html=True)
+            st.markdown("<p style='text-align: center;'>📍 Orijinal Çizim</p>", unsafe_allow_html=True)
             fig1, ax1 = plt.subplots(figsize=(8, 6), facecolor='#0e1117')
             
             # DOSYAYI FİLTRESİZ OKUYUP ÇİZİYORUZ
