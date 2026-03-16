@@ -11,24 +11,28 @@ from io import BytesIO
 # --- 1. KURUMSAL TEMA VE SAYFA AYARI ---
 st.set_page_config(page_title="Metraj Pro | Barış Öker", layout="wide", page_icon="🏢")
 
+# CSS: Metrikleri ve kartları SİYAH yapmak için en agresif stil
 st.markdown("""
     <style>
     .stApp { background-color: #0e1117; }
-    [data-testid="stMetricValue"], 
-    [data-testid="stMetricLabel"],
-    [data-testid="stMetricValue"] > div,
-    [data-testid="stMetricLabel"] > div {
+    
+    /* Beyaz kartların içindeki her şeyi (etiket, değer) siyah yapar */
+    [data-testid="stMetric"], 
+    [data-testid="stMetricValue"] div, 
+    [data-testid="stMetricLabel"] div {
         color: #000000 !important;
-        font-weight: bold !important;
+        font-weight: 800 !important;
     }
+    
     div[data-testid="stMetric"] {
         background-color: #ffffff !important;
-        border: 2px solid #dcdde1;
-        padding: 20px;
-        border-radius: 12px;
-        box-shadow: 0px 4px 10px rgba(0,0,0,0.3);
+        border: 2px solid #ffffff;
+        padding: 15px;
+        border-radius: 10px;
     }
-    h1, h2, h3, p, span { color: #ffffff !important; }
+    
+    /* Diğer başlıklar beyaz kalsın */
+    h1, h2, h3, p { color: #ffffff !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -130,6 +134,7 @@ if dxf_up:
         st.subheader("🚀 Analiz Raporu")
         
         c1, c2, c3 = st.columns(3)
+        # Metriklerin yazıları CSS ile siyah yapıldı
         c1.metric("Net Uzunluk", f"{round(total_l, 2)} m")
         c2.metric("Toplam Alan", f"{round(total_l * h_sel, 2)} m²")
         c3.metric("Aks Sayısı", len(res))
@@ -166,22 +171,18 @@ if dxf_up:
             st.pyplot(fig2)
         
         st.subheader("📋 Metraj Detay Listesi")
-        # Tabloyu oluşturma
         df_data = [{"No": i+1, "Uzunluk (m)": round(r['len'], 2), "Alan (m²)": round(r['len']*h_sel, 2)} for i, r in enumerate(res)]
         df = pd.DataFrame(df_data)
         st.dataframe(df, use_container_width=True)
 
-        # --- EXCEL İNDİRME MOTORU ---
-        def to_excel(df):
-            output = BytesIO()
-            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                df.to_excel(writer, index=False, sheet_name='Metraj_Raporu')
-            return output.getvalue()
+        # Hata veren motor (xlsxwriter) yerine openpyxl kullanarak Excel oluşturma
+        output = BytesIO()
+        df.to_excel(output, index=False, engine='openpyxl')
+        excel_val = output.getvalue()
 
-        excel_data = to_excel(df)
         st.download_button(
             label="📊 Metraj Listesini Excel Olarak İndir",
-            data=excel_data,
+            data=excel_val,
             file_name=f"Metraj_Raporu_{dxf_up.name}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
