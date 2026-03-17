@@ -3,6 +3,5 @@ ezdxf
 matplotlib
 pandas
 numpy
-openpyxl
 roboflow
-python-dotenv
+openpyxl
