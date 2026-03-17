@@ -12,3 +12,4 @@ pdfplumber
 fpdf
 roboflow
 python-dotenv
+openpyxl
