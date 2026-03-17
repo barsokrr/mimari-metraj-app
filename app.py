@@ -17,7 +17,7 @@ st.markdown("""
     <style>
     .stApp { background-color: #0e1117; }
     
-    /* Metrik Kutuları Görünürlük Ayarı */
+    /* Metrik Kutuları Görünürlük Ayarı - Siyah Yazı / Beyaz Arka Plan */
     [data-testid="stMetric"] {
         background-color: #FFFFFF !important;
         border: 2px solid #e0e0e0;
@@ -92,14 +92,15 @@ def get_refined_segments(path, scale, layers):
 
 def run_roboflow_ai(image_path):
     """Roboflow API üzerinden görsel analiz yapar."""
-    # NOT: Kendi API Key ve Proje bilgilerinizi buraya girin
     try:
-        rf = Roboflow(api_key="SENIN_API_KEYIN")
-        project = rf.workspace().project("duvar-tespit-modeli")
-        model = project.version(1).model
-        prediction = model.predict(image_path, confidence=40).json()
+        # Görseldeki panel verilerine göre güncellenmiştir 
+        rf = Roboflow(api_key="BURAYA_API_KEYINIZI_YAZIN") 
+        project = rf.workspace("bars-workspace").project("mimari_duvar_tespiti-2")
+        model = project.version(8).model
+        prediction = model.predict(image_path, confidence=50).json()
         return prediction['predictions']
-    except:
+    except Exception as e:
+        st.error(f"AI Analiz Hatası: {e}")
         return []
 
 # --- 4. YAN PANEL (SIDEBAR) ---
@@ -170,10 +171,22 @@ if dxf_up:
             ax.axis("off")
             st.pyplot(fig)
 
-        # --- AI ANALİZ BUTONU ---
-        if st.button("🤖 Roboflow AI Analizini Çalıştır"):
-            st.warning("AI Entegrasyonu için API Key gereklidir. Girdiğinizde bu bölüm aktifleşecektir.")
-            # Burada yukarıdaki run_roboflow_ai fonksiyonu çağrılır.
+        # --- AI ANALİZ BÖLÜMÜ ---
+        st.divider()
+        if st.button("🤖 Roboflow AI Analizini Başlat"):
+            with st.spinner("AI Modeli planı analiz ediyor..."):
+                # Planı resme çevirip AI'ya gönderiyoruz
+                temp_img = "ai_analysis_temp.png"
+                fig.savefig(temp_img, bbox_inches='tight', pad_inches=0)
+                
+                ai_results = run_roboflow_ai(temp_img)
+                
+                if ai_results:
+                    st.subheader("🎯 AI Tespit Sonuçları")
+                    for i, res in enumerate(ai_results):
+                        st.info(f"Duvar Bölgesi {i+1}: %{res['confidence']*100:.2f} Doğruluk Oranı")
+                else:
+                    st.warning("API Key girilmediği veya model eşleşmediği için AI analizi tamamlanamadı.")
 
         # --- EXCEL ÇIKTISI ---
         output = BytesIO()
