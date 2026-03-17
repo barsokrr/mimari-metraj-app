@@ -10,3 +10,4 @@ scikit-learn
 PyYAML
 pdfplumber
 fpdf
+roboflow
