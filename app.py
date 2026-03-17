@@ -7,7 +7,13 @@ import pandas as pd
 import os
 import numpy as np
 from io import BytesIO
-from roboflow import Roboflow
+
+# Hata alınan kütüphaneleri güvenli içe aktarma
+try:
+    from roboflow import Roboflow
+except ImportError:
+    st.error("Sistemde 'roboflow' kütüphanesi eksik. Lütfen requirements.txt dosyanızı kontrol edin.")
+
 from PIL import Image
 
 # --- 1. KURUMSAL TEMA VE GELİŞMİŞ CSS ---
@@ -93,14 +99,15 @@ def get_refined_segments(path, scale, layers):
 def run_roboflow_ai(image_path):
     """Roboflow API üzerinden görsel analiz yapar."""
     try:
-        # Görseldeki panel verilerine göre güncellenmiştir 
+        # Görseldeki panel verilerine göre güncellenmiştir [cite: 9]
+        # Not: API Key'inizi Streamlit Secrets'ta saklamanız önerilir
         rf = Roboflow(api_key="BURAYA_API_KEYINIZI_YAZIN") 
-        project = rf.workspace("bars-workspace").project("mimari_duvar_tespiti-2")
-        model = project.version(8).model
+        project = rf.workspace("bars-workspace").project("mimari_duvar_tespiti-2") [cite: 9]
+        model = project.version(8).model [cite: 9]
         prediction = model.predict(image_path, confidence=50).json()
         return prediction['predictions']
     except Exception as e:
-        st.error(f"AI Analiz Hatası: {e}")
+        st.error(f"Roboflow API Hatası: {e}. Lütfen API Key ve proje bilgilerini kontrol edin.")
         return []
 
 # --- 4. YAN PANEL (SIDEBAR) ---
@@ -176,17 +183,17 @@ if dxf_up:
         if st.button("🤖 Roboflow AI Analizini Başlat"):
             with st.spinner("AI Modeli planı analiz ediyor..."):
                 # Planı resme çevirip AI'ya gönderiyoruz
-                temp_img = "ai_analysis_temp.png"
-                fig.savefig(temp_img, bbox_inches='tight', pad_inches=0)
+                temp_img_path = "ai_analysis_temp.png"
+                fig.savefig(temp_img_path, bbox_inches='tight', pad_inches=0)
                 
-                ai_results = run_roboflow_ai(temp_img)
+                ai_results = run_roboflow_ai(temp_img_path)
                 
                 if ai_results:
                     st.subheader("🎯 AI Tespit Sonuçları")
                     for i, res in enumerate(ai_results):
-                        st.info(f"Duvar Bölgesi {i+1}: %{res['confidence']*100:.2f} Doğruluk Oranı")
+                        st.info(f"Duvar Bölgesi {i+1}: %{res['confidence']*100:.2f} Doğruluk Oranı") [cite: 9]
                 else:
-                    st.warning("API Key girilmediği veya model eşleşmediği için AI analizi tamamlanamadı.")
+                    st.warning("Tespit yapılamadı. Lütfen API Key'inizi girdiğinizden ve modelin aktif olduğundan emin olun.")
 
         # --- EXCEL ÇIKTISI ---
         output = BytesIO()
@@ -200,4 +207,5 @@ if dxf_up:
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
         
-    os.remove(t_path)
+    if os.path.exists(t_path):
+        os.remove(t_path)
