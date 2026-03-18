@@ -61,7 +61,7 @@ if st.sidebar.button("Çıkış Yap"):
     st.session_state.logged_in = False
     st.rerun()
 
-st.title("🏗️ DUVAR METRAJ VE PLAN ANALİZİ")
+st.title("Metraj analizi")
 
 with st.sidebar:
     st.header("⚙️ Ayarlar")
@@ -93,7 +93,7 @@ if uploaded:
         col_img1, col_img2 = st.columns(2)
         
         with col_img1:
-            st.subheader("🖼️ Orijinal Plan (Tümü)")
+            st.subheader("Gerçek Plan")
             fig1, ax1 = plt.subplots(figsize=(8, 8))
             for g in full_project:
                 xs, ys = zip(*g)
@@ -103,7 +103,7 @@ if uploaded:
             st.pyplot(fig1)
 
         with col_img2:
-            st.subheader("🔍 Duvar Analizi (Filtreli)")
+            st.subheader("Duvar analizi")
             fig2, ax2 = plt.subplots(figsize=(8, 8))
             for g in wall_analysis:
                 xs, ys = zip(*g)
