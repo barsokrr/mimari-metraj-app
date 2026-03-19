@@ -11,20 +11,17 @@ from io import BytesIO
 # --- 1. SAYFA YAPILANDIRMASI ---
 st.set_page_config(page_title="SaaS Metraj Pro", layout="wide")
 
-# CSS: Dosya yükleme alanını ve butonları özelleştirme
+# CSS: Buton ve yükleme alanı özelleştirmeleri
 st.markdown("""
     <style>
     .stButton>button { width: 100%; border-radius: 5px; height: 3em; background-color: #262730; color: white; }
     .stDownloadButton>button { width: 100%; background-color: #00c853; color: white; }
-    /* Dosya yükleme alanı metni için */
-    .st-emotion-cache-9ycgxx::file-selector-button { background-color: #262730; color: white; }
     </style>
     """, unsafe_allow_html=True)
 
 # --- 2. AI MODEL FONKSİYONU ---
 def run_roboflow_ai(image_bytes):
     try:
-        # Roboflow bilgilerini buraya yerleştir
         rf = Roboflow(api_key="SENIN_API_KEYIN")
         project = rf.workspace("SENIN_WORKSPACE").project("SENIN_PROJEN")
         model = project.version(8).model 
@@ -62,25 +59,25 @@ def get_dxf_geometry(path, target_layers=None):
 # --- 4. YAN MENÜ (SIDEBAR) ---
 with st.sidebar:
     st.write("Kullanıcı adı: admin")
+    st.write("---")
     
+    # Dosya Yükleme Alanı
+    uploaded = st.file_uploader(
+        "Dosya yükleyin • DXF", 
+        type=["dxf"]
+    )
+    
+    # Ayarlar
+    katmanlar = st.text_input("Katman Filtresi", "DUVAR")
+    kat_yuk = st.number_input("Kat Yüksekliği (m)", value=2.85, step=0.01)
+    birim = st.selectbox("Çizim Birimi", ["cm", "mm", "m"], index=0)
+    
+    # Çıkış Yap Butonu En Alta Taşıma (Boşluk bırakarak)
+    st.write("") 
+    st.write("")
     if st.button("Çıkış Yap"):
         st.session_state.logged_in = False
         st.rerun()
-    
-    st.write("---")
-    
-    # İSTEDİĞİN DEĞİŞİKLİK: Dosya yükleme alanı Türkçeleştirildi
-    uploaded = st.file_uploader(
-        "Dosya yükleyin • DXF", 
-        type=["dxf"],
-        help="Dosyayı buraya sürükleyip bırakabilir veya seçebilirsiniz. Sınır: 200MB"
-    )
-    
-    # Katman ve Yükseklik Alanları
-    katmanlar = st.text_input("Katman Filtresi", "DUVAR")
-    kat_yuk = st.number_input("Kat Yüksekliği (m)", value=2.85, step=0.01)
-    
-    birim = st.selectbox("Çizim Birimi", ["cm", "mm", "m"], index=0)
 
 # --- 5. ANA EKRAN VE ANALİZ ---
 st.title("🏗️ Metraj Analizi")
@@ -128,16 +125,15 @@ if uploaded:
             st.pyplot(fig2)
 
         st.divider()
-        m1, m2, m3 = st.columns(3)
+        m1, m2 = st.columns(2)
         m1.metric("Toplam Uzunluk", f"{net_uzunluk:.2f} m")
         m2.metric("Toplam Alan", f"{toplam_alan:.2f} m²")
-        m3.metric("Obje Sayısı", f"{len(wall_analysis)}")
 
         df = pd.DataFrame({
             "İmalat": ["Duvar Metrajı"],
             "Birim": ["m²"],
             "Miktar": [round(toplam_alan, 2)],
-            "Kat Yüksekliği": [kat_yuk]
+            "Yükseklik": [kat_yuk]
         })
         st.table(df)
         
