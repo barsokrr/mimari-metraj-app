@@ -1,39 +1,3 @@
-import streamlit as st
-import ezdxf
-import matplotlib.pyplot as plt
-import pandas as pd
-import math
-import tempfile
-import os
-from roboflow import Roboflow
-from io import BytesIO
-
-# --- 1. OTURUM KONTROLÜ (EN ÜSTTE OLMALI) ---
-if 'logged_in' not in st.session_state:
-    st.session_state.logged_in = False
-
-# --- 2. SAYFA YAPILANDIRMASI ---
-st.set_page_config(page_title="SaaS Metraj Pro", layout="wide")
-
-# CSS: Profil alanı ve buton özelleştirmeleri
-st.markdown("""
-    <style>
-    .profile-area { text-align: center; padding: 10px; margin-bottom: 20px; }
-    .profile-img { border-radius: 50%; width: 80px; height: 80px; object-fit: cover; border: 2px solid #FF4B4B; margin-bottom: 10px; }
-    .user-name { font-weight: bold; font-size: 1.1em; color: white; margin-bottom: 0px; }
-    .company-name { font-size: 0.9em; color: #888; margin-top: -5px; }
-    .stButton>button { width: 100%; border-radius: 5px; height: 3em; background-color: #262730; color: white; }
-    .stDownloadButton>button { width: 100%; background-color: #00c853; color: white; }
-    </style>
-    """, unsafe_allow_html=True)
-
-# --- 3. GİRİŞ EKRANI FONKSİYONU ---
-def login_screen():
-    st.title("🏗️ SaaS Metraj Pro Giriş")
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        with st.form("login_form"):
-            username = st.text_input("Kullanıcı Adı")
             password = st.text_input("Şifre", type="password")
             submit = st.form_submit_button("Giriş Yap")
             
@@ -86,8 +50,8 @@ else:
         st.markdown(f"""
             <div class="profile-area">
                 <img src="https://www.w3schools.com/howto/img_avatar.png" class="profile-img">
-                <p class="user-name">Barış KORKMAZ</p>
-                <p class="company-name">Fi-le Yazılım A.Ş.</p>
+                <p class="user-name">Kullanıcı Adı</p>
+                <p class="company-name">Firma</p>
             </div>
         """, unsafe_allow_html=True)
         
