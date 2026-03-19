@@ -62,8 +62,8 @@ with st.sidebar:
     st.markdown(f"""
         <div class="profile-area">
             <img src="https://www.w3schools.com/howto/img_avatar.png" class="profile-img">
-            <p class="user-name">Barış KORKMAZ</p>
-            <p class="company-name">Fi-le Yazılım A.Ş.</p>
+            <p class="user-name"> Kullanıcı Adı </p>
+            <p class="company-name">Firma</p>
         </div>
     """, unsafe_allow_html=True)
     
