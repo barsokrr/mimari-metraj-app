@@ -11,9 +11,13 @@ from io import BytesIO
 # --- 1. SAYFA YAPILANDIRMASI ---
 st.set_page_config(page_title="SaaS Metraj Pro", layout="wide")
 
-# CSS: Buton ve yükleme alanı özelleştirmeleri
+# CSS: Profil alanı ve buton özelleştirmeleri
 st.markdown("""
     <style>
+    .profile-area { text-align: center; padding: 10px; margin-bottom: 20px; }
+    .profile-img { border-radius: 50%; width: 80px; height: 80px; object-fit: cover; border: 2px solid #FF4B4B; margin-bottom: 10px; }
+    .user-name { font-weight: bold; font-size: 1.1em; color: white; margin-bottom: 0px; }
+    .company-name { font-size: 0.9em; color: #888; margin-top: -5px; }
     .stButton>button { width: 100%; border-radius: 5px; height: 3em; background-color: #262730; color: white; }
     .stDownloadButton>button { width: 100%; background-color: #00c853; color: white; }
     </style>
@@ -25,14 +29,12 @@ def run_roboflow_ai(image_bytes):
         rf = Roboflow(api_key="SENIN_API_KEYIN")
         project = rf.workspace("SENIN_WORKSPACE").project("SENIN_PROJEN")
         model = project.version(8).model 
-        
         with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
             tmp.write(image_bytes.getvalue())
             prediction = model.predict(tmp.name, confidence=40).json()
         os.remove(tmp.name)
         return prediction.get('predictions', [])
-    except Exception:
-        return []
+    except Exception: return []
 
 # --- 3. DXF GEOMETRİ FONKSİYONU ---
 def get_dxf_geometry(path, target_layers=None):
@@ -41,13 +43,10 @@ def get_dxf_geometry(path, target_layers=None):
         msp = doc.modelspace()
         geometries = []
         entities = msp.query('LINE LWPOLYLINE POLYLINE')
-        
         for e in entities:
             if target_layers:
                 layer_name = e.dxf.layer.upper()
-                if not any(t.upper() in layer_name for t in target_layers):
-                    continue
-            
+                if not any(t.upper() in layer_name for t in target_layers): continue
             if e.dxftype() in ("LWPOLYLINE", "POLYLINE"):
                 pts = [(p[0], p[1]) for p in e.get_points()]
                 if len(pts) > 1: geometries.append(pts)
@@ -58,23 +57,29 @@ def get_dxf_geometry(path, target_layers=None):
 
 # --- 4. YAN MENÜ (SIDEBAR) ---
 with st.sidebar:
-    st.write("Kullanıcı adı: admin")
+    # --- PROFIL ALANI ---
+    # Not: URL kısmına kendi profil resminin linkini koyabilirsin.
+    st.markdown(f"""
+        <div class="profile-area">
+            <img src="https://www.w3schools.com/howto/img_avatar.png" class="profile-img">
+            <p class="user-name">Barış KORKMAZ</p>
+            <p class="company-name">Fi-le Yazılım A.Ş.</p>
+        </div>
+    """, unsafe_allow_html=True)
+    
     st.write("---")
     
     # Dosya Yükleme Alanı
-    uploaded = st.file_uploader(
-        "Dosya yükleyin • DXF", 
-        type=["dxf"]
-    )
+    uploaded = st.file_uploader("Dosya yükleyin • DXF", type=["dxf"])
     
     # Ayarlar
     katmanlar = st.text_input("Katman Filtresi", "DUVAR")
     kat_yuk = st.number_input("Kat Yüksekliği (m)", value=2.85, step=0.01)
     birim = st.selectbox("Çizim Birimi", ["cm", "mm", "m"], index=0)
     
-    # Çıkış Yap Butonu En Alta Taşıma (Boşluk bırakarak)
-    st.write("") 
-    st.write("")
+    # Sayfa sonuna itmek için boşluk
+    for _ in range(5): st.write("")
+    
     if st.button("Çıkış Yap"):
         st.session_state.logged_in = False
         st.rerun()
@@ -98,7 +103,6 @@ if uploaded:
         toplam_alan = net_uzunluk * kat_yuk
 
         col1, col2 = st.columns(2)
-        
         with col1:
             st.subheader("Orijinal Plan")
             fig1, ax1 = plt.subplots(figsize=(10, 10), facecolor='#0e1117')
@@ -121,7 +125,6 @@ if uploaded:
                 fig2.savefig(img_buf, format='png')
                 preds = run_roboflow_ai(img_buf)
                 st.info(f"AI {len(preds)} adet yapısal eleman doğruladı.")
-                
             st.pyplot(fig2)
 
         st.divider()
@@ -131,15 +134,14 @@ if uploaded:
 
         df = pd.DataFrame({
             "İmalat": ["Duvar Metrajı"],
-            "Birim": ["m²"],
             "Miktar": [round(toplam_alan, 2)],
-            "Yükseklik": [kat_yuk]
+            "Birim": ["m²"],
+            "Kat Yüksekliği": [kat_yuk]
         })
         st.table(df)
         
         csv = df.to_csv(index=False).encode('utf-8')
         st.download_button("📥 Metraj Cetvelini İndir (CSV)", csv, "rapor.csv")
-
     os.remove(file_path)
 else:
     st.info("Lütfen sol menüden bir DXF dosyası yükleyerek analizi başlatın.")
