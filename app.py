@@ -1,18 +1,35 @@
-            password = st.text_input("Şifre", type="password")
-            submit = st.form_submit_button("Giriş Yap")
-            
-            if submit:
-                # Burayı kendi kullanıcı adı ve şifrenle güncelleyebilirsin
-                if username == "admin" and password == "1234":
-                    st.session_state.logged_in = True
-                    st.success("Giriş başarılı! Yönlendiriliyorsunuz...")
-                    st.rerun()
-                else:
-                    st.error("Hatalı kullanıcı adı veya şifre!")
+import streamlit as st
+import ezdxf
+import matplotlib.pyplot as plt
+import pandas as pd
+import math
+import tempfile
+import os
+from roboflow import Roboflow
+from io import BytesIO
 
-# --- 4. YARDIMCI FONKSİYONLAR ---
+# --- 1. OTURUM KONTROLÜ VE SAYFA AYARI ---
+if 'logged_in' not in st.session_state:
+    st.session_state.logged_in = False
+
+st.set_page_config(page_title="SaaS Metraj Pro", layout="wide")
+
+# CSS: Profil alanı ve buton özelleştirmeleri
+st.markdown("""
+    <style>
+    .profile-area { text-align: center; padding: 10px; margin-bottom: 20px; }
+    .profile-img { border-radius: 50%; width: 80px; height: 80px; object-fit: cover; border: 2px solid #FF4B4B; margin-bottom: 10px; }
+    .user-name { font-weight: bold; font-size: 1.1em; color: white; margin-bottom: 0px; }
+    .company-name { font-size: 0.9em; color: #888; margin-top: -5px; }
+    .stButton>button { width: 100%; border-radius: 5px; height: 3em; background-color: #262730; color: white; }
+    .stDownloadButton>button { width: 100%; background-color: #00c853; color: white; }
+    </style>
+    """, unsafe_allow_html=True)
+
+# --- 2. YARDIMCI FONKSİYONLAR ---
 def run_roboflow_ai(image_bytes):
     try:
+        # Not: Kendi API Key bilgilerini buraya girmelisin
         rf = Roboflow(api_key="SENIN_API_KEYIN")
         project = rf.workspace("SENIN_WORKSPACE").project("SENIN_PROJEN")
         model = project.version(8).model 
@@ -41,17 +58,32 @@ def get_dxf_geometry(path, target_layers=None):
         return geometries
     except: return []
 
-# --- 5. ANA PROGRAM AKIŞI ---
+# --- 3. GİRİŞ EKRANI ---
 if not st.session_state.logged_in:
-    login_screen()
+    st.title("🏗️ SaaS Metraj Pro Giriş")
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        with st.form("login_form"):
+            user_input = st.text_input("Kullanıcı Adı")
+            pass_input = st.text_input("Şifre", type="password")
+            submitted = st.form_submit_button("Giriş Yap")
+            
+            if submitted:
+                if user_input == "admin" and pass_input == "1234":
+                    st.session_state.logged_in = True
+                    st.rerun()
+                else:
+                    st.error("Hatalı kullanıcı adı veya şifre!")
+
+# --- 4. ANA PROGRAM (Giriş Yapıldıysa) ---
 else:
-    # --- YAN MENÜ (SIDEBAR) ---
+    # YAN MENÜ (SIDEBAR)
     with st.sidebar:
         st.markdown(f"""
             <div class="profile-area">
                 <img src="https://www.w3schools.com/howto/img_avatar.png" class="profile-img">
-                <p class="user-name">Kullanıcı Adı</p>
-                <p class="company-name">Firma</p>
+                <p class="user-name">Barış KORKMAZ</p>
+                <p class="company-name">Fi-le Yazılım A.Ş.</p>
             </div>
         """, unsafe_allow_html=True)
         
@@ -61,14 +93,13 @@ else:
         kat_yuk = st.number_input("Kat Yüksekliği (m)", value=2.85, step=0.01)
         birim = st.selectbox("Çizim Birimi", ["cm", "mm", "m"], index=0)
         
+        # Boşluk ve Çıkış Yap
         for _ in range(5): st.write("")
-        
-        # ÇIKIŞ YAP BUTONU
         if st.button("Çıkış Yap"):
             st.session_state.logged_in = False
             st.rerun()
 
-    # --- ANA EKRAN VE ANALİZ ---
+    # ANA EKRAN ANALİZ BÖLÜMÜ
     st.title("🏗️ Metraj Analizi")
 
     if uploaded:
@@ -81,11 +112,13 @@ else:
         wall_analysis = get_dxf_geometry(file_path, target_list)
 
         if wall_analysis:
+            # Hesaplamalar
             raw_len = sum(math.dist(g[i], g[i+1]) for g in wall_analysis for i in range(len(g)-1))
             bolen = 100 if birim == "cm" else (1000 if birim == "mm" else 1)
             net_uzunluk = (raw_len / 2) / bolen
             toplam_alan = net_uzunluk * kat_yuk
 
+            # Görselleştirme
             col1, col2 = st.columns(2)
             with col1:
                 st.subheader("Orijinal Plan")
@@ -111,6 +144,7 @@ else:
                     st.info(f"AI {len(preds)} adet yapısal eleman doğruladı.")
                 st.pyplot(fig2)
 
+            # Raporlama
             st.divider()
             m1, m2 = st.columns(2)
             m1.metric("Toplam Uzunluk", f"{net_uzunluk:.2f} m")
@@ -126,6 +160,7 @@ else:
             
             csv = df.to_csv(index=False).encode('utf-8')
             st.download_button("📥 Metraj Cetvelini İndir (CSV)", csv, "rapor.csv")
+        
         os.remove(file_path)
     else:
         st.info("Lütfen sol menüden bir DXF dosyası yükleyerek analizi başlatın.")
