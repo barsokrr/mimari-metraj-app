@@ -60,7 +60,7 @@ def get_dxf_geometry(path, target_layers=None):
 
 # --- 3. GİRİŞ EKRANI ---
 if not st.session_state.logged_in:
-    st.title("🏗️ SaaS Metraj Pro Giriş")
+    st.title("🏗️ Metraj Analiz Giriş")
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         with st.form("login_form"):
