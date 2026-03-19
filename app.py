@@ -29,7 +29,7 @@ st.markdown("""
 # --- 2. YARDIMCI FONKSİYONLAR ---
 def run_roboflow_ai(image_bytes):
     try:
-        # Not: Kendi API Key bilgilerini buraya girmelisin
+        
         rf = Roboflow(api_key="SENIN_API_KEYIN")
         project = rf.workspace("SENIN_WORKSPACE").project("SENIN_PROJEN")
         model = project.version(8).model 
