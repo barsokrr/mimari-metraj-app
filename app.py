@@ -8,7 +8,11 @@ import os
 from roboflow import Roboflow
 from io import BytesIO
 
-# --- 1. SAYFA YAPILANDIRMASI ---
+# --- 1. OTURUM KONTROLÜ (EN ÜSTTE OLMALI) ---
+if 'logged_in' not in st.session_state:
+    st.session_state.logged_in = False
+
+# --- 2. SAYFA YAPILANDIRMASI ---
 st.set_page_config(page_title="SaaS Metraj Pro", layout="wide")
 
 # CSS: Profil alanı ve buton özelleştirmeleri
@@ -23,7 +27,26 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. AI MODEL FONKSİYONU ---
+# --- 3. GİRİŞ EKRANI FONKSİYONU ---
+def login_screen():
+    st.title("🏗️ SaaS Metraj Pro Giriş")
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        with st.form("login_form"):
+            username = st.text_input("Kullanıcı Adı")
+            password = st.text_input("Şifre", type="password")
+            submit = st.form_submit_button("Giriş Yap")
+            
+            if submit:
+                # Burayı kendi kullanıcı adı ve şifrenle güncelleyebilirsin
+                if username == "admin" and password == "1234":
+                    st.session_state.logged_in = True
+                    st.success("Giriş başarılı! Yönlendiriliyorsunuz...")
+                    st.rerun()
+                else:
+                    st.error("Hatalı kullanıcı adı veya şifre!")
+
+# --- 4. YARDIMCI FONKSİYONLAR ---
 def run_roboflow_ai(image_bytes):
     try:
         rf = Roboflow(api_key="SENIN_API_KEYIN")
@@ -36,7 +59,6 @@ def run_roboflow_ai(image_bytes):
         return prediction.get('predictions', [])
     except Exception: return []
 
-# --- 3. DXF GEOMETRİ FONKSİYONU ---
 def get_dxf_geometry(path, target_layers=None):
     try:
         doc = ezdxf.readfile(path)
@@ -55,93 +77,91 @@ def get_dxf_geometry(path, target_layers=None):
         return geometries
     except: return []
 
-# --- 4. YAN MENÜ (SIDEBAR) ---
-with st.sidebar:
-    # --- PROFIL ALANI ---
-    # Not: URL kısmına kendi profil resminin linkini koyabilirsin.
-    st.markdown(f"""
-        <div class="profile-area">
-            <img src="https://www.w3schools.com/howto/img_avatar.png" class="profile-img">
-            <p class="user-name"> Kullanıcı Adı </p>
-            <p class="company-name">Firma</p>
-        </div>
-    """, unsafe_allow_html=True)
-    
-    st.write("---")
-    
-    # Dosya Yükleme Alanı
-    uploaded = st.file_uploader("Dosya yükleyin • DXF", type=["dxf"])
-    
-    # Ayarlar
-    katmanlar = st.text_input("Katman Filtresi", "DUVAR")
-    kat_yuk = st.number_input("Kat Yüksekliği (m)", value=2.85, step=0.01)
-    birim = st.selectbox("Çizim Birimi", ["cm", "mm", "m"], index=0)
-    
-    # Sayfa sonuna itmek için boşluk
-    for _ in range(5): st.write("")
-    
-    if st.button("Çıkış Yap"):
-        st.session_state.logged_in = False
-        st.rerun()
-
-# --- 5. ANA EKRAN VE ANALİZ ---
-st.title("🏗️ Metraj Analizi")
-
-if uploaded:
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".dxf") as tmp:
-        tmp.write(uploaded.getbuffer())
-        file_path = tmp.name
-
-    target_list = [x.strip() for x in katmanlar.split(",")]
-    full_project = get_dxf_geometry(file_path)
-    wall_analysis = get_dxf_geometry(file_path, target_list)
-
-    if wall_analysis:
-        raw_len = sum(math.dist(g[i], g[i+1]) for g in wall_analysis for i in range(len(g)-1))
-        bolen = 100 if birim == "cm" else (1000 if birim == "mm" else 1)
-        net_uzunluk = (raw_len / 2) / bolen
-        toplam_alan = net_uzunluk * kat_yuk
-
-        col1, col2 = st.columns(2)
-        with col1:
-            st.subheader("Orijinal Plan")
-            fig1, ax1 = plt.subplots(figsize=(10, 10), facecolor='#0e1117')
-            for g in full_project:
-                xs, ys = zip(*g)
-                ax1.plot(xs, ys, color="gray", lw=0.5, alpha=0.5)
-            ax1.set_aspect("equal"); ax1.axis("off")
-            st.pyplot(fig1)
-
-        with col2:
-            st.subheader("Duvar Analizi (AI & CAD)")
-            fig2, ax2 = plt.subplots(figsize=(10, 10), facecolor='#0e1117')
-            for g in wall_analysis:
-                xs, ys = zip(*g)
-                ax2.plot(xs, ys, color="#FF4B4B", lw=1.5)
-            ax2.set_aspect("equal"); ax2.axis("off")
-            
-            if st.button("🤖 AI ile Doğrula"):
-                img_buf = BytesIO()
-                fig2.savefig(img_buf, format='png')
-                preds = run_roboflow_ai(img_buf)
-                st.info(f"AI {len(preds)} adet yapısal eleman doğruladı.")
-            st.pyplot(fig2)
-
-        st.divider()
-        m1, m2 = st.columns(2)
-        m1.metric("Toplam Uzunluk", f"{net_uzunluk:.2f} m")
-        m2.metric("Toplam Alan", f"{toplam_alan:.2f} m²")
-
-        df = pd.DataFrame({
-            "İmalat": ["Duvar Metrajı"],
-            "Miktar": [round(toplam_alan, 2)],
-            "Birim": ["m²"],
-            "Kat Yüksekliği": [kat_yuk]
-        })
-        st.table(df)
-        
-        csv = df.to_csv(index=False).encode('utf-8')
-        st.download_button("📥 Metraj Cetvelini İndir (CSV)", csv, "rapor.csv")
-    os.remove(file_path)
+# --- 5. ANA PROGRAM AKIŞI ---
+if not st.session_state.logged_in:
+    login_screen()
 else:
-    st.info("Lütfen sol menüden bir DXF dosyası yükleyerek analizi başlatın.")
+    # --- YAN MENÜ (SIDEBAR) ---
+    with st.sidebar:
+        st.markdown(f"""
+            <div class="profile-area">
+                <img src="https://www.w3schools.com/howto/img_avatar.png" class="profile-img">
+                <p class="user-name">Barış KORKMAZ</p>
+                <p class="company-name">Fi-le Yazılım A.Ş.</p>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        st.write("---")
+        uploaded = st.file_uploader("Dosya yükleyin • DXF", type=["dxf"])
+        katmanlar = st.text_input("Katman Filtresi", "DUVAR")
+        kat_yuk = st.number_input("Kat Yüksekliği (m)", value=2.85, step=0.01)
+        birim = st.selectbox("Çizim Birimi", ["cm", "mm", "m"], index=0)
+        
+        for _ in range(5): st.write("")
+        
+        # ÇIKIŞ YAP BUTONU
+        if st.button("Çıkış Yap"):
+            st.session_state.logged_in = False
+            st.rerun()
+
+    # --- ANA EKRAN VE ANALİZ ---
+    st.title("🏗️ Metraj Analizi")
+
+    if uploaded:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".dxf") as tmp:
+            tmp.write(uploaded.getbuffer())
+            file_path = tmp.name
+
+        target_list = [x.strip() for x in katmanlar.split(",")]
+        full_project = get_dxf_geometry(file_path)
+        wall_analysis = get_dxf_geometry(file_path, target_list)
+
+        if wall_analysis:
+            raw_len = sum(math.dist(g[i], g[i+1]) for g in wall_analysis for i in range(len(g)-1))
+            bolen = 100 if birim == "cm" else (1000 if birim == "mm" else 1)
+            net_uzunluk = (raw_len / 2) / bolen
+            toplam_alan = net_uzunluk * kat_yuk
+
+            col1, col2 = st.columns(2)
+            with col1:
+                st.subheader("Orijinal Plan")
+                fig1, ax1 = plt.subplots(figsize=(10, 10), facecolor='#0e1117')
+                for g in full_project:
+                    xs, ys = zip(*g)
+                    ax1.plot(xs, ys, color="gray", lw=0.5, alpha=0.5)
+                ax1.set_aspect("equal"); ax1.axis("off")
+                st.pyplot(fig1)
+
+            with col2:
+                st.subheader("Duvar Analizi (AI & CAD)")
+                fig2, ax2 = plt.subplots(figsize=(10, 10), facecolor='#0e1117')
+                for g in wall_analysis:
+                    xs, ys = zip(*g)
+                    ax2.plot(xs, ys, color="#FF4B4B", lw=1.5)
+                ax2.set_aspect("equal"); ax2.axis("off")
+                
+                if st.button("🤖 AI ile Doğrula"):
+                    img_buf = BytesIO()
+                    fig2.savefig(img_buf, format='png')
+                    preds = run_roboflow_ai(img_buf)
+                    st.info(f"AI {len(preds)} adet yapısal eleman doğruladı.")
+                st.pyplot(fig2)
+
+            st.divider()
+            m1, m2 = st.columns(2)
+            m1.metric("Toplam Uzunluk", f"{net_uzunluk:.2f} m")
+            m2.metric("Toplam Alan", f"{toplam_alan:.2f} m²")
+
+            df = pd.DataFrame({
+                "İmalat": ["Duvar Metrajı"],
+                "Miktar": [round(toplam_alan, 2)],
+                "Birim": ["m²"],
+                "Kat Yüksekliği": [kat_yuk]
+            })
+            st.table(df)
+            
+            csv = df.to_csv(index=False).encode('utf-8')
+            st.download_button("📥 Metraj Cetvelini İndir (CSV)", csv, "rapor.csv")
+        os.remove(file_path)
+    else:
+        st.info("Lütfen sol menüden bir DXF dosyası yükleyerek analizi başlatın.")
