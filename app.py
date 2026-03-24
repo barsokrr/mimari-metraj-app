@@ -28,6 +28,7 @@ st.markdown("""
 # --- 2. YARDIMCI FONKSİYONLAR ---
 
 def run_roboflow_ai(image_bytes):
+    """Roboflow AI tahmini (isteğe bağlı doğrulama)"""
     try:
         rf = Roboflow(api_key="BURAYA_GERÇEK_API_KEYİNİ_YAZ")
         project = rf.workspace("WORKSPACE_ADI").project("PROJE_ADI")
@@ -43,6 +44,7 @@ def run_roboflow_ai(image_bytes):
         return []
 
 def get_dxf_geometry(path, target_layers=None):
+    """Belirtilen katmanlardan çizgi verilerini döndürür"""
     geometries = []
     try:
         doc = ezdxf.readfile(path)
@@ -54,7 +56,10 @@ def get_dxf_geometry(path, target_layers=None):
                     continue
 
             if e.dxftype() == "LINE":
-                geometries.append([(e.dxf.start[0], e.dxf.start[1]), (e.dxf.end[0], e.dxf.end[1])])
+                geometries.append([
+                    (e.dxf.start[0], e.dxf.start[1]),
+                    (e.dxf.end[0], e.dxf.end[1])
+                ])
             elif e.dxftype() in ("LWPOLYLINE", "POLYLINE"):
                 pts = [(p[0], p[1]) for p in e]
                 if len(pts) > 1:
@@ -92,7 +97,6 @@ else:
         kat_yuk = st.number_input("Kat Yüksekliği (m)", value=2.85, step=0.01)
         birim = st.selectbox("Çizim Birimi", ["cm", "mm", "m"], index=0)
         st.markdown("<br>"*4, unsafe_allow_html=True)
-
         if st.button("Çıkış Yap"):
             st.session_state.logged_in = False
             st.rerun()
@@ -110,13 +114,17 @@ else:
             wall_analysis = get_dxf_geometry(file_path, target_list)
 
             if wall_analysis:
+                # --- Hesaplama ---
                 raw_len = sum(math.dist(g[i], g[i+1]) for g in wall_analysis for i in range(len(g)-1))
                 bolen = 100 if birim == "cm" else (1000 if birim == "mm" else 1)
-                net_uzunluk = raw_len / bolen
+                # 👇 Çift çizgi duvarlar için /2 geri eklendi
+                net_uzunluk = (raw_len / 2) / bolen
                 toplam_alan = net_uzunluk * kat_yuk
 
+                # --- Görselleştirme ---
                 col1, col2 = st.columns(2)
                 with col1:
+                    st.subheader("Orijinal Plan")
                     fig1, ax1 = plt.subplots(figsize=(10, 10), facecolor='#0e1117')
                     for g in full_project:
                         xs, ys = zip(*g)
@@ -125,6 +133,7 @@ else:
                     st.pyplot(fig1)
 
                 with col2:
+                    st.subheader("Duvar Analizi (AI & CAD)")
                     fig2, ax2 = plt.subplots(figsize=(10, 10), facecolor='#0e1117')
                     for g in wall_analysis:
                         xs, ys = zip(*g)
@@ -136,12 +145,13 @@ else:
                         fig2.savefig(img_buf, format='png')
                         preds = run_roboflow_ai(img_buf)
                         st.info(f"AI {len(preds)} adet eleman doğruladı.")
-
                     st.pyplot(fig2)
 
+                # --- Çıktı ve Rapor ---
                 st.divider()
-                st.metric("Toplam Uzunluk", f"{net_uzunluk:.2f} m")
-                st.metric("Toplam Alan", f"{toplam_alan:.2f} m²")
+                m1, m2 = st.columns(2)
+                m1.metric("Toplam Uzunluk", f"{net_uzunluk:.2f} m")
+                m2.metric("Toplam Alan", f"{toplam_alan:.2f} m²")
 
                 df = pd.DataFrame({
                     "İmalat": ["Duvar Metrajı"],
@@ -153,8 +163,10 @@ else:
 
                 csv = df.to_csv(index=False).encode('utf-8')
                 st.download_button("📥 Metraj Cetvelini İndir (CSV)", csv, "rapor.csv")
+
             else:
                 st.warning("Seçilen katmanda çizim bulunamadı.")
+
         finally:
             if os.path.exists(file_path):
                 os.remove(file_path)
