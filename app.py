@@ -14,7 +14,7 @@ st.set_page_config(page_title="Barış Öker - AI Metraj Pro", layout="wide")
 def get_ai_predictions(image_bytes):
     try:
         # BURAYI KENDİ BİLGİLERİNLE GÜNCELLE
-        rf = Roboflow(api_key="SENIN_API_KEYIN")
+        rf = Roboflow(api_key="my238ZSyFyxbwEVQHISP")
         project = rf.workspace("workspace-adın").project("proje-adın")
         model = project.version(1).model 
         
