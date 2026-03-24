@@ -1,709 +1,461 @@
 """
-Mimari Metraj Uygulaması
+Mimari Duvar Metraj Uygulaması
 Geliştirici: Barış Öker - Fi-le Yazılım A.Ş.
-Kütüphaneler: Streamlit, ezdxf, matplotlib, numpy
+Sürüm: 2.0 - Stabil
 """
-
 import streamlit as st
 import ezdxf
 import matplotlib.pyplot as plt
-import matplotlib.patches as patches
-from matplotlib.patches import Arc as MatplotlibArc
-import numpy as np
-from pathlib import Path
+import pandas as pd
 import math
+import tempfile
+import os
 
 # =============================================================================
 # SAYFA KONFİGÜRASYONU
 # =============================================================================
-st.set_page_config(
-    page_title="Mimari Metraj Sistemi",
-    page_icon="🏗️",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+st.set_page_config(page_title="Duvar Metraj Pro", layout="wide")
 
 # CSS Stilleri
 st.markdown("""
-<style>
-    .main-header {
-        font-size: 2.5rem;
-        font-weight: bold;
-        color: #1f77b4;
+    <style>
+    .profile-card {
         text-align: center;
-        margin-bottom: 2rem;
+        padding: 1rem;
+        background-color: #262730;
+        border-radius: 10px;
+        margin-bottom: 1rem;
     }
-    .metric-card {
+    .profile-img {
+        border-radius: 50%;
+        width: 80px;
+        height: 80px;
+        border: 3px solid #FF4B4B;
+        margin-bottom: 0.5rem;
+    }
+    .metric-box {
         background-color: #f0f2f6;
         padding: 1.5rem;
         border-radius: 10px;
-        border-left: 5px solid #1f77b4;
+        border-left: 5px solid #FF4B4B;
     }
-    .profile-card {
-        background-color: #ffffff;
-        padding: 1.5rem;
-        border-radius: 10px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        margin-bottom: 2rem;
-    }
-    .success-box {
-        background-color: #d4edda;
-        color: #155724;
-        padding: 1rem;
-        border-radius: 5px;
-        border-left: 5px solid #28a745;
-    }
-    .error-box {
-        background-color: #f8d7da;
-        color: #721c24;
-        padding: 1rem;
-        border-radius: 5px;
-        border-left: 5px solid #dc3545;
-    }
-</style>
+    </style>
 """, unsafe_allow_html=True)
 
 # =============================================================================
-# PROFİL BİLGİLERİ (SOL MENÜ)
+# YARDIMCI FONKSİYONLAR
 # =============================================================================
-def render_sidebar_profile():
-    """Sol menüde profil bilgilerini gösterir."""
-    with st.sidebar:
-        st.markdown("""
-        <div class="profile-card">
-            <h3>👤 Profil</h3>
-            <hr>
-            <p><strong>İsim:</strong><br>Barış Öker</p>
-            <p><strong>Firma:</strong><br>Fi-le Yazılım A.Ş.</p>
-            <p><strong>Uygulama:</strong><br>Mimari Metraj Sistemi v1.0</p>
-        </div>
-        """, unsafe_allow_html=True)
 
-# =============================================================================
-# DXF YÜKLEME VE KATMAN LİSTESİ
-# =============================================================================
-@st.cache_data
-def load_dxf_file(file_content):
-    """
-    DXF dosyasını yükler ve katman listesini çıkarır.
-    ezdxf 1.1+ uyumlu, stabil yükleme.
-    """
-    try:
-        # BytesIO'dan geçici dosya oluştur
-        import tempfile
-        import os
-        
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.dxf') as tmp_file:
-            tmp_file.write(file_content)
-            tmp_path = tmp_file.name
-        
-        # DXF dosyasını yükle (herhangi bir version)
-        try:
-            doc = ezdxf.readfile(tmp_path)
-        except ezdxf.DXFError:
-            # Eğer hata verirse recover modunda dene
-            doc = ezdxf.recover.readfile(tmp_path)
-        
-        # Tüm katmanları topla
-        layers = set()
-        for entity in doc.modelspace():
-            if hasattr(entity, 'dxf') and hasattr(entity.dxf, 'layer'):
-                layers.add(entity.dxf.layer)
-        
-        # Temizlik
-        os.unlink(tmp_path)
-        
-        return doc, sorted(list(layers))
-    
-    except Exception as e:
-        st.error(f"DXF yükleme hatası: {str(e)}")
-        return None, []
-
-# =============================================================================
-# KOORDİNAT HESAPLAMA (Manuel - BBOX hatalarını önler)
-# =============================================================================
-def get_entity_bounds(entity):
-    """
-    Entity'nin sınırlarını manuel hesaplar.
-    ezdxf 1.1+'da get_bbox() hatalarını önlemek için.
-    """
-    points = []
-    
-    try:
-        entity_type = entity.dxftype()
-        
-        if entity_type == 'LINE':
-            points = [entity.dxf.start, entity.dxf.end]
-            
-        elif entity_type in ['LWPOLYLINE', 'POLYLINE']:
-            # Tüm vertex'leri al
-            if hasattr(entity, 'get_points'):
-                pts = entity.get_points('xy')
-                points = [(p[0], p[1]) for p in pts]
-            elif hasattr(entity, 'vertices'):
-                for v in entity.vertices:
-                    points.append((v.dxf.location.x, v.dxf.location.y))
-                    
-        elif entity_type == 'ARC':
-            # Yay'ın sınırlarını hesapla
-            center = entity.dxf.center
-            radius = entity.dxf.radius
-            start_angle = math.radians(entity.dxf.start_angle)
-            end_angle = math.radians(entity.dxf.end_angle)
-            
-            # Yay üzerinde örnek noktalar
-            angles = np.linspace(start_angle, end_angle, 20)
-            for angle in angles:
-                x = center[0] + radius * math.cos(angle)
-                y = center[1] + radius * math.sin(angle)
-                points.append((x, y))
-                
-        elif entity_type == 'CIRCLE':
-            center = entity.dxf.center
-            radius = entity.dxf.radius
-            points = [
-                (center[0] - radius, center[1] - radius),
-                (center[0] + radius, center[1] + radius)
-            ]
-            
-        elif entity_type == 'TEXT' or entity_type == 'MTEXT':
-            if hasattr(entity.dxf, 'insert'):
-                points = [entity.dxf.insert]
-                
-    except Exception as e:
-        pass
-    
-    if not points:
-        return None
-    
-    x_coords = [p[0] for p in points]
-    y_coords = [p[1] for p in points]
-    
-    return {
-        'min_x': min(x_coords),
-        'max_x': max(x_coords),
-        'min_y': min(y_coords),
-        'max_y': max(y_coords)
-    }
-
-# =============================================================================
-# DUVAR METRAJI HESAPLAMA
-# =============================================================================
-def calculate_wall_metrics(doc, layer_name, floor_height=3.0):
-    """
-    Seçilen katmandaki LINE ve LWPOLYLINE uzunluklarını hesaplar.
-    Toplam uzunluğu 2'ye bölerek aks uzunluğunu bulur, kat yüksekliği ile çarpar.
-    """
-    total_length = 0.0
-    entity_count = 0
-    
+def get_layers_from_dxf(doc):
+    """DXF dosyasındaki tüm katmanları döndürür."""
+    layers = set()
     for entity in doc.modelspace():
-        if hasattr(entity, 'dxf') and entity.dxf.layer == layer_name:
-            entity_type = entity.dxftype()
-            
-            try:
-                if entity_type == 'LINE':
-                    start = entity.dxf.start
-                    end = entity.dxf.end
-                    length = math.sqrt((end[0]-start[0])**2 + (end[1]-start[1])**2)
-                    total_length += length
-                    entity_count += 1
-                    
-                elif entity_type == 'LWPOLYLINE':
-                    # Polyline uzunluğu
-                    if hasattr(entity, 'get_points'):
-                        pts = entity.get_points('xy')
-                        for i in range(len(pts)-1):
-                            x1, y1 = pts[i][0], pts[i][1]
-                            x2, y2 = pts[i+1][0], pts[i+1][1]
-                            length = math.sqrt((x2-x1)**2 + (y2-y1)**2)
-                            total_length += length
-                        entity_count += 1
-                        
-            except Exception as e:
+        if hasattr(entity.dxf, 'layer'):
+            layers.add(entity.dxf.layer)
+    return sorted(list(layers))
+
+def calculate_wall_length(doc, target_layers, birim="cm"):
+    """
+    Belirtilen katmanlardaki LINE ve LWPOLYLINE uzunluklarını hesaplar.
+    Çift çizgili duvarlar için toplam uzunluğu 2'ye böler (aks uzunluğu).
+    """
+    total_raw_length = 0.0
+    processed_entities = 0
+    
+    # Birim çarpanı (metreye çevirmek için)
+    birim_carpani = {
+        "mm": 1000.0,
+        "cm": 100.0,
+        "m": 1.0
+    }.get(birim, 100.0)
+    
+    msp = doc.modelspace()
+    
+    for entity in msp:
+        entity_layer = getattr(entity.dxf, 'layer', '').upper()
+        
+        # Katman filtresi kontrolü
+        if target_layers:
+            # Virgülle ayrılmış katmanları kontrol et
+            layer_match = False
+            for target in target_layers:
+                if target.upper().strip() in entity_layer:
+                    layer_match = True
+                    break
+            if not layer_match:
                 continue
-    
-    # Aks uzunluğu = Toplam uzunluk / 2 (çift çizgili duvarlar için)
-    axis_length = total_length / 2 if total_length > 0 else 0
-    
-    # Duvar alanı = Aks uzunluğu × Kat yüksekliği
-    wall_area = axis_length * floor_height
-    
-    return {
-        'total_length': total_length,
-        'axis_length': axis_length,
-        'wall_area': wall_area,
-        'entity_count': entity_count
-    }
-
-# =============================================================================
-# KAPI SAYIMI (ARC OBJELERI)
-# =============================================================================
-def count_doors(doc):
-    """
-    Modelspacedeki tüm ARC objelerini sayar (her ARC bir kapı açılışı).
-    """
-    arc_count = 0
-    arc_details = []
-    
-    for entity in doc.modelspace():
-        if entity.dxftype() == 'ARC':
-            try:
-                arc_count += 1
-                arc_details.append({
-                    'center': entity.dxf.center,
-                    'radius': entity.dxf.radius,
-                    'start_angle': entity.dxf.start_angle,
-                    'end_angle': entity.dxf.end_angle
-                })
-            except Exception as e:
-                continue
-    
-    return arc_count, arc_details
-
-# =============================================================================
-# ZEMIN METRAJI (KAPALI LWPOLYLINE ALANLARI)
-# =============================================================================
-def calculate_floor_area(doc, layer_name):
-    """
-    Seçilen katmandaki kapalı LWPOLYLINE objelerinin alanını hesaplar.
-    Shoelace algoritması kullanır.
-    """
-    total_area = 0.0
-    room_count = 0
-    room_areas = []
-    
-    for entity in doc.modelspace():
-        if hasattr(entity, 'dxf') and entity.dxf.layer == layer_name:
-            if entity.dxftype() == 'LWPOLYLINE':
-                try:
-                    # Kapalı polyline kontrolü
-                    is_closed = False
-                    if hasattr(entity.dxf, 'flags'):
-                        is_closed = bool(entity.dxf.flags & 1)
-                    elif hasattr(entity, 'closed'):
-                        is_closed = entity.closed
-                    elif hasattr(entity.dxf, 'closed'):
-                        is_closed = entity.dxf.closed
-                    
-                    # Noktaları al
-                    if hasattr(entity, 'get_points'):
-                        pts = entity.get_points('xy')
-                        
-                        # Alan hesaplama (Shoelace formülü)
-                        area = 0.0
-                        n = len(pts)
-                        for i in range(n):
-                            j = (i + 1) % n
-                            area += pts[i][0] * pts[j][1]
-                            area -= pts[j][0] * pts[i][1]
-                        area = abs(area) / 2.0
-                        
-                        if area > 0:
-                            total_area += area
-                            room_count += 1
-                            room_areas.append({
-                                'area': area,
-                                'is_closed': is_closed,
-                                'vertices': len(pts)
-                            })
-                            
-                except Exception as e:
-                    continue
-    
-    return {
-        'total_area': total_area,
-        'room_count': room_count,
-        'room_details': room_areas
-    }
-
-# =============================================================================
-# SHOELACE ALGORITMASI (Yedek alan hesaplama)
-# =============================================================================
-def shoelace_area(points):
-    """Shoelace formülü ile poligon alanı hesaplar."""
-    n = len(points)
-    area = 0.0
-    for i in range(n):
-        j = (i + 1) % n
-        area += points[i][0] * points[j][1]
-        area -= points[j][0] * points[i][1]
-    return abs(area) / 2.0
-
-# =============================================================================
-# MATPLOTLIB GÖRSELLEŞTİRME
-# =============================================================================
-def create_dxf_preview(doc, wall_layer=None, floor_layer=None, highlight_arcs=True):
-    """
-    DXF planının matplotlib önizlemesini oluşturur.
-    """
-    fig, ax = plt.subplots(figsize=(12, 10))
-    
-    all_x = []
-    all_y = []
-    
-    # Renk haritası
-    colors = {
-        'wall': '#FF6B6B',      # Kırmızı tonu - duvarlar
-        'floor': '#4ECDC4',     # Turkuaz - zeminler
-        'arc': '#FFE66D',       # Sarı - kapılar (ARC)
-        'other': '#95A5A6'      # Gri - diğer
-    }
-    
-    arc_count = 0
-    
-    for entity in doc.modelspace():
+        
         try:
             entity_type = entity.dxftype()
-            layer = getattr(entity.dxf, 'layer', '0')
             
-            # Renk belirleme
-            color = colors['other']
-            linewidth = 0.8
-            alpha = 0.6
-            
-            if layer == wall_layer:
-                color = colors['wall']
-                linewidth = 1.5
-                alpha = 0.9
-            elif layer == floor_layer:
-                color = colors['floor']
-                linewidth = 2.0
-                alpha = 0.7
-            elif entity_type == 'ARC' and highlight_arcs:
-                color = colors['arc']
-                linewidth = 2.5
-                alpha = 1.0
-            
-            # Çizim
-            if entity_type == 'LINE':
+            # LINE objesi
+            if entity_type == "LINE":
                 start = entity.dxf.start
                 end = entity.dxf.end
-                ax.plot([start[0], end[0]], [start[1], end[1]], 
-                       color=color, linewidth=linewidth, alpha=alpha)
-                all_x.extend([start[0], end[0]])
-                all_y.extend([start[1], end[1]])
+                length = math.sqrt((end[0]-start[0])**2 + (end[1]-start[1])**2)
+                total_raw_length += length
+                processed_entities += 1
                 
-            elif entity_type == 'LWPOLYLINE':
+            # LWPOLYLINE objesi (kapalı veya açık)
+            elif entity_type == "LWPOLYLINE":
                 if hasattr(entity, 'get_points'):
-                    pts = entity.get_points('xy')
-                    x = [p[0] for p in pts]
-                    y = [p[1] for p in pts]
-                    
-                    # Kapalıysa dolgu, değilse çizgi
-                    is_closed = False
-                    if hasattr(entity.dxf, 'flags'):
-                        is_closed = bool(entity.dxf.flags & 1)
-                    
-                    if is_closed and layer == floor_layer:
-                        ax.fill(x, y, color=color, alpha=0.3)
-                    else:
-                        ax.plot(x + [x[0]] if is_closed else x, 
-                               y + [y[0]] if is_closed else y, 
-                               color=color, linewidth=linewidth, alpha=alpha)
-                    
-                    all_x.extend(x)
-                    all_y.extend(y)
-                    
-            elif entity_type == 'ARC' and highlight_arcs:
-                center = entity.dxf.center
-                radius = entity.dxf.radius
-                start_angle = entity.dxf.start_angle
-                end_angle = entity.dxf.end_angle
+                    points = list(entity.get_points('xy'))
+                    if len(points) >= 2:
+                        # Segment uzunluklarını topla
+                        for i in range(len(points)-1):
+                            x1, y1 = points[i][0], points[i][1]
+                            x2, y2 = points[i+1][0], points[i+1][1]
+                            segment = math.sqrt((x2-x1)**2 + (y2-y1)**2)
+                            total_raw_length += segment
+                        processed_entities += 1
+                        
+            # Eski POLYLINE formatı (nadiren kullanılır ama destekleyelim)
+            elif entity_type == "POLYLINE":
+                vertices = []
+                for v in entity.vertices:
+                    vertices.append((v.dxf.location.x, v.dxf.location.y))
                 
-                # Yay çizimi
-                arc_angles = np.linspace(
-                    np.radians(start_angle), 
-                    np.radians(end_angle), 
-                    50
-                )
-                x = center[0] + radius * np.cos(arc_angles)
-                y = center[1] + radius * np.sin(arc_angles)
-                ax.plot(x, y, color=color, linewidth=linewidth, alpha=alpha)
-                
-                # Kapı sembolü (küçük daire)
-                door_circle = plt.Circle(
-                    center, radius*0.1, 
-                    color='#FF4757', fill=True, alpha=0.8
-                )
-                ax.add_patch(door_circle)
-                
-                arc_count += 1
-                all_x.extend([center[0] - radius, center[0] + radius])
-                all_y.extend([center[1] - radius, center[1] + radius])
-                
+                if len(vertices) >= 2:
+                    for i in range(len(vertices)-1):
+                        x1, y1 = vertices[i]
+                        x2, y2 = vertices[i+1]
+                        segment = math.sqrt((x2-x1)**2 + (y2-y1)**2)
+                        total_raw_length += segment
+                    processed_entities += 1
+                    
         except Exception as e:
             continue
     
-    # Görünüm ayarları
-    if all_x and all_y:
-        margin = 0.1
-        x_range = max(all_x) - min(all_x)
-        y_range = max(all_y) - min(all_y)
-        ax.set_xlim(min(all_x) - margin*x_range, max(all_x) + margin*x_range)
-        ax.set_ylim(min(all_y) - margin*y_range, max(all_y) + margin*y_range)
+    # Çift çizgili duvar mantığı: Toplam uzunluk / 2 = Aks uzunluğu
+    aks_uzunluk = total_raw_length / 2.0 if total_raw_length > 0 else 0.0
+    
+    # Metreye çevir
+    aks_uzunluk_metre = aks_uzunluk / birim_carpani
+    toplam_ham_metre = total_raw_length / birim_carpani
+    
+    return {
+        'ham_uzunluk': toplam_ham_metre,
+        'aks_uzunluk': aks_uzunluk_metre,
+        'entity_sayisi': processed_entities
+    }
+
+def draw_wall_preview(doc, target_layers, wall_data):
+    """Sadece duvar katmanlarını kırmızı ile vurgulayan plan görseli."""
+    fig, ax = plt.subplots(figsize=(12, 10), facecolor='#0e1117')
+    ax.set_facecolor('#0e1117')
+    
+    # Tüm entity'leri çiz (gri arka plan)
+    for entity in doc.modelspace():
+        try:
+            color = "#333333"  # Koyu gri - diğer katmanlar
+            linewidth = 0.5
+            
+            # Hedef katman kontrolü
+            entity_layer = getattr(entity.dxf, 'layer', '').upper()
+            is_target = False
+            for target in target_layers:
+                if target.upper().strip() in entity_layer:
+                    color = "#FF4B4B"  # Kırmızı - duvarlar
+                    linewidth = 2.0
+                    is_target = True
+                    break
+            
+            entity_type = entity.dxftype()
+            
+            if entity_type == "LINE":
+                start = entity.dxf.start
+                end = entity.dxf.end
+                ax.plot([start[0], end[0]], [start[1], end[1]], 
+                       color=color, linewidth=linewidth, alpha=0.8)
+                       
+            elif entity_type == "LWPOLYLINE":
+                if hasattr(entity, 'get_points'):
+                    pts = list(entity.get_points('xy'))
+                    if len(pts) >= 2:
+                        xs = [p[0] for p in pts]
+                        ys = [p[1] for p in pts]
+                        # Kapalıysa ilk noktayı sona ekle
+                        if entity.closed:
+                            xs.append(xs[0])
+                            ys.append(ys[0])
+                        ax.plot(xs, ys, color=color, linewidth=linewidth, alpha=0.8)
+                        
+        except Exception as e:
+            continue
     
     ax.set_aspect('equal')
-    ax.grid(True, alpha=0.3)
-    ax.set_title('DXF Plan Önizlemesi', fontsize=14, fontweight='bold')
-    ax.set_xlabel('X Koordinatı (m)', fontsize=10)
-    ax.set_ylabel('Y Koordinatı (m)', fontsize=10)
-    
-    # Legend
-    from matplotlib.lines import Line2D
-    legend_elements = [
-        Line2D([0], [0], color=colors['wall'], lw=2, label=f'Duvar Katmanı: {wall_layer}'),
-        Line2D([0], [0], color=colors['floor'], lw=2, label=f'Zemin Katmanı: {floor_layer}'),
-        Line2D([0], [0], color=colors['arc'], lw=3, label=f'Kapılar (ARC): {arc_count} adet')
-    ]
-    ax.legend(handles=legend_elements, loc='upper right', fontsize=9)
+    ax.axis('off')
+    ax.set_title(f"Duvar Analizi: {wall_data['entity_sayisi']} obje | "
+                f"Aks: {wall_data['aks_uzunluk']:.2f}m", 
+                color='white', fontsize=12, pad=20)
     
     plt.tight_layout()
     return fig
 
 # =============================================================================
+# GİRİŞ EKRANI
+# =============================================================================
+if 'logged_in' not in st.session_state:
+    st.session_state.logged_in = False
+
+if not st.session_state.logged_in:
+    st.title("🏗️ Duvar Metraj Sistemi - Giriş")
+    
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        with st.form("login"):
+            username = st.text_input("Kullanıcı Adı", value="admin")
+            password = st.text_input("Şifre", type="password", value="1234")
+            login_btn = st.form_submit_button("Giriş Yap", use_container_width=True)
+            
+            if login_btn:
+                if username == "admin" and password == "1234":
+                    st.session_state.logged_in = True
+                    st.rerun()
+                else:
+                    st.error("❌ Hatalı giriş bilgileri!")
+    
+    st.markdown("---")
+    st.info("💡 **Demo Hesap:** Kullanıcı: `admin` | Şifre: `1234`")
+
+# =============================================================================
 # ANA UYGULAMA
 # =============================================================================
-def main():
-    # Profil render
-    render_sidebar_profile()
-    
-    # Başlık
-    st.markdown('<h1 class="main-header">🏗️ Mimari Metraj Sistemi</h1>', 
-                unsafe_allow_html=True)
-    
-    # DXF Yükleme Bölümü
-    st.subheader("📁 Proje Yükleme")
-    uploaded_file = st.file_uploader(
-        "DXF dosyasını seçin (AutoCAD .dxf)",
-        type=['dxf'],
-        help="Mimari planınızın DXF formatında kaydedilmiş olması gerekir."
-    )
-    
-    if uploaded_file is not None:
-        # Dosyayı oku
-        file_content = uploaded_file.getvalue()
-        
-        # DXF Yükle
-        with st.spinner('DXF dosyası analiz ediliyor...'):
-            doc, layers = load_dxf_file(file_content)
-        
-        if doc is None:
-            st.markdown("""
-            <div class="error-box">
-                <strong>Hata!</strong> DXF dosyası okunamadı. 
-                Lütfen dosyanın bozuk olmadığını kontrol edin.
+else:
+    # SIDEBAR - PROFİL
+    with st.sidebar:
+        st.markdown("""
+            <div class="profile-card">
+                <img src="https://www.w3schools.com/howto/img_avatar.png" class="profile-img">
+                <h4 style="color: white; margin: 0;">Barış Öker</h4>
+                <p style="color: #888; margin: 0; font-size: 0.9em;">Fi-le Yazılım A.Ş.</p>
             </div>
-            """, unsafe_allow_html=True)
-            return
-        
-        # Başarı mesajı
-        st.markdown(f"""
-        <div class="success-box">
-            <strong>Başarılı!</strong> {uploaded_file.name} yüklendi. 
-            Toplam <strong>{len(layers)}</strong> katman bulundu.
-        </div>
         """, unsafe_allow_html=True)
         
-        # Katman Seçimleri
-        st.subheader("🔧 Katman Seçimleri")
+        st.divider()
         
-        col1, col2 = st.columns(2)
+        # DOSYA YÜKLEME
+        uploaded = st.file_uploader("📁 DXF Dosyası", type=["dxf"])
         
-        with col1:
-            wall_layer = st.selectbox(
-                "🧱 Duvar Katmanını Seçin:",
-                options=layers,
-                index=0 if layers else None,
-                help="Duvar çizgilerinin bulunduğu katman (LINE ve LWPOLYLINE)"
-            )
+        # KATMAN SEÇİMİ (Dosya yüklenince aktif olur)
+        katman_secimi = st.text_input(
+            "🧱 Duvar Katman(ları)", 
+            value="DUVAR",
+            help="Virgülle ayrılmış: DUVAR, WALL, A-WALL"
+        )
+        
+        # PARAMETRELER
+        kat_yuksekligi = st.number_input(
+            "📏 Kat Yüksekliği (m)", 
+            min_value=1.0, 
+            max_value=20.0, 
+            value=2.85, 
+            step=0.01
+        )
+        
+        birim = st.selectbox(
+            "📐 Çizim Birimi",
+            options=["cm", "mm", "m"],
+            index=0,
+            help="DXF'in çizildiği birim"
+        )
+        
+        st.divider()
+        
+        # ÇIKIŞ
+        if st.button("🚪 Çıkış Yap", use_container_width=True):
+            st.session_state.logged_in = False
+            st.rerun()
+
+    # ANA EKRAN
+    st.title("🏗️ Duvar Metraj Analizi")
+    
+    if uploaded is not None:
+        # DXF'i işle
+        try:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".dxf") as tmp:
+                tmp.write(uploaded.getvalue())
+                tmp_path = tmp.name
             
-            floor_height = st.number_input(
-                "📏 Kat Yüksekliği (m):",
-                min_value=2.0,
-                max_value=10.0,
-                value=3.0,
-                step=0.1,
-                help="Standart kat yüksekliği (genellikle 2.8-3.2m)"
-            )
-        
-        with col2:
-            floor_layer = st.selectbox(
-                "🏠 Zemin/Alan Katmanını Seçin:",
-                options=layers,
-                index=min(1, len(layers)-1) if len(layers) > 1 else 0,
-                help="Kapalı alanların (odalar) bulunduğu katman"
-            )
-        
-        # Hesaplama Butonu
-        st.markdown("---")
-        
-        if st.button("🚀 Metraj Hesaplamasını Başlat", type="primary", use_container_width=True):
+            # DXF'i oku
+            doc = ezdxf.readfile(tmp_path)
             
-            with st.spinner('Hesaplamalar yapılıyor...'):
+            # Katmanları göster (bilgi amaçlı)
+            tum_katmanlar = get_layers_from_dxf(doc)
+            with st.expander(f"📋 DXF'teki Katmanlar ({len(tum_katmanlar)} adet)"):
+                st.write(", ".join(tum_katmanlar))
+            
+            # Hedef katmanları ayır
+            hedef_katmanlar = [k.strip() for k in katmanlar_secimi.split(",") if k.strip()]
+            
+            # METRAJ HESAPLA
+            wall_data = calculate_wall_length(doc, hedef_katmanlar, birim)
+            
+            if wall_data['entity_sayisi'] == 0:
+                st.warning(f"⚠️ '{katman_secimi}' katmanında duvar bulunamadı!")
+                st.info(f"💡 Mevcut katmanlar: {', '.join(tum_katmanlar[:10])}...")
+            else:
+                # Alan hesapla
+                toplam_alan = wall_data['aks_uzunluk'] * kat_yuksekligi
                 
-                # 1. Duvar Metrajı
-                wall_results = calculate_wall_metrics(doc, wall_layer, floor_height)
+                # SONUÇLAR
+                st.subheader("📊 Hesaplama Sonuçları")
                 
-                # 2. Kapı Sayımı (ARC objeleri)
-                door_count, door_details = count_doors(doc)
-                
-                # 3. Zemin Metrajı
-                floor_results = calculate_floor_area(doc, floor_layer)
-                
-                # Sonuçları Göster
-                st.subheader("📊 Metraj Sonuçları")
-                
-                # Metrik Kartlar
                 col1, col2, col3, col4 = st.columns(4)
                 
                 with col1:
                     st.markdown(f"""
-                    <div class="metric-card">
-                        <h4>🧱 Duvar Alanı</h4>
-                        <h2>{wall_results['wall_area']:.2f} m²</h2>
-                        <small>Aks: {wall_results['axis_length']:.2f}m × Yükseklik: {floor_height}m</small>
-                    </div>
+                        <div class="metric-box">
+                            <h4>🧱 Ham Uzunluk</h4>
+                            <h2>{wall_data['ham_uzunluk']:.2f} m</h2>
+                            <small>Çift çizgiler toplamı</small>
+                        </div>
                     """, unsafe_allow_html=True)
                 
                 with col2:
                     st.markdown(f"""
-                    <div class="metric-card">
-                        <h4>🚪 Kapı Sayısı</h4>
-                        <h2>{door_count} adet</h2>
-                        <small>Toplam ARC objesi sayısı</small>
-                    </div>
+                        <div class="metric-box">
+                            <h4>📐 Aks Uzunluğu</h4>
+                            <h2>{wall_data['aks_uzunluk']:.2f} m</h2>
+                            <small>Ham / 2</small>
+                        </div>
                     """, unsafe_allow_html=True)
                 
                 with col3:
                     st.markdown(f"""
-                    <div class="metric-card">
-                        <h4>🏠 Zemin Alanı</h4>
-                        <h2>{floor_results['total_area']:.2f} m²</h2>
-                        <small>{floor_results['room_count']} kapalı alan</small>
-                    </div>
+                        <div class="metric-box">
+                            <h4>📏 Kat Yüksekliği</h4>
+                            <h2>{kat_yuksekligi:.2f} m</h2>
+                            <small>Girdiğiniz değer</small>
+                        </div>
                     """, unsafe_allow_html=True)
                 
                 with col4:
-                    hacim = wall_results['wall_area'] * 0.2  # Kabaca duvar hacmi
                     st.markdown(f"""
-                    <div class="metric-card">
-                        <h4>📦 Tahmini Hacim</h4>
-                        <h2>{hacim:.2f} m³</h2>
-                        <small>Duvar hacmi (kabaca)</small>
-                    </div>
+                        <div class="metric-box">
+                            <h4>🏠 Toplam Alan</h4>
+                            <h2 style="color: #FF4B4B;">{toplam_alan:.2f} m²</h2>
+                            <small>Aks × Yükseklik</small>
+                        </div>
                     """, unsafe_allow_html=True)
                 
-                # Detaylı Tablolar
-                st.markdown("---")
-                
-                tab1, tab2, tab3 = st.tabs(["🧱 Duvar Detayları", "🚪 Kapı Listesi", "🏠 Zemin Detayları"])
-                
-                with tab1:
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.metric("Toplam Çizgi Uzunluğu", f"{wall_results['total_length']:.2f} m")
-                        st.metric("Aks Uzunluğu (/2)", f"{wall_results['axis_length']:.2f} m")
-                    with col2:
-                        st.metric("İşlenen Entity Sayısı", f"{wall_results['entity_count']}")
-                        st.metric("Kat Yüksekliği", f"{floor_height} m")
-                
-                with tab2:
-                    st.write(f"**Toplam Kapı (ARC) Sayısı:** {door_count}")
-                    if door_details:
-                        door_df = [{
-                            'No': i+1,
-                            'Merkez X': d['center'][0],
-                            'Merkez Y': d['center'][1],
-                            'Yarıçap (m)': d['radius'],
-                            'Başlangıç Açı': d['start_angle'],
-                            'Bitiş Açı': d['end_angle']
-                        } for i, d in enumerate(door_details[:20])]  # İlk 20
-                        st.dataframe(door_df, use_container_width=True)
-                        if len(door_details) > 20:
-                            st.info(f"... ve {len(door_details)-20} adet daha")
-                
-                with tab3:
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.metric("Toplam Zemin Alanı", f"{floor_results['total_area']:.2f} m²")
-                        st.metric("Oda Sayısı", f"{floor_results['room_count']}")
-                    with col2:
-                        if floor_results['room_details']:
-                            avg_area = floor_results['total_area'] / floor_results['room_count']
-                            st.metric("Ortalama Oda Alanı", f"{avg_area:.2f} m²")
-                
-                # Plan Önizlemesi
-                st.markdown("---")
-                st.subheader("🗺️ Plan Önizlemesi")
-                
-                preview_fig = create_dxf_preview(
-                    doc, 
-                    wall_layer=wall_layer, 
-                    floor_layer=floor_layer,
-                    highlight_arcs=True
-                )
-                st.pyplot(preview_fig, use_container_width=True)
-                
-                # İndirme butonları
-                st.markdown("---")
-                col1, col2 = st.columns(2)
+                # GÖRSELLEŞTİRME
+                st.divider()
+                col1, col2 = st.columns([2, 1])
                 
                 with col1:
-                    # Rapor metni oluştur
-                    report = f"""
-MİMARİ METRAJ RAPORU
-====================
-Proje: {uploaded_file.name}
-Tarih: {st.session_state.get('_', '2024')}
-Hazırlayan: Barış Öker - Fi-le Yazılım A.Ş.
-
-DUVAR METRAJI
--------------
-Katman: {wall_layer}
-Toplam Çizgi Uzunluğu: {wall_results['total_length']:.2f} m
-Aks Uzunluğu: {wall_results['axis_length']:.2f} m
-Kat Yüksekliği: {floor_height} m
-Duvar Alanı: {wall_results['wall_area']:.2f} m²
-
-KAPI SAYIMI
------------
-Toplam Kapı (ARC): {door_count} adet
-
-ZEMIN METRAJI
--------------
-Katman: {floor_layer}
-Toplam Alan: {floor_results['total_area']:.2f} m²
-Oda Sayısı: {floor_results['room_count']}
-                    """
+                    st.subheader("🗺️ Plan Görünümü")
+                    fig = draw_wall_preview(doc, hedef_katmanlar, wall_data)
+                    st.pyplot(fig, use_container_width=True)
+                
+                with col2:
+                    st.subheader("📋 Rapor")
+                    
+                    rapor_data = {
+                        "Parametre": [
+                            "DXF Dosyası",
+                            "Duvar Katmanı",
+                            "Çizim Birimi",
+                            "İşlenen Objeler",
+                            "Ham Uzunluk",
+                            "Aks Uzunluğu",
+                            "Kat Yüksekliği",
+                            "Toplam Duvar Alanı"
+                        ],
+                        "Değer": [
+                            uploaded.name,
+                            katman_secimi,
+                            birim,
+                            f"{wall_data['entity_sayisi']} adet",
+                            f"{wall_data['ham_uzunluk']:.2f} m",
+                            f"{wall_data['aks_uzunluk']:.2f} m",
+                            f"{kat_yuksekligi:.2f} m",
+                            f"{toplam_alan:.2f} m²"
+                        ]
+                    }
+                    
+                    df_rapor = pd.DataFrame(rapor_data)
+                    st.table(df_rapor)
+                    
+                    # CSV İNDİR
+                    csv_data = {
+                        "Proje": [uploaded.name],
+                        "Katman": [katman_secimi],
+                        "Birim": [birim],
+                        "Aks_Uzunluk_m": [round(wall_data['aks_uzunluk'], 2)],
+                        "Kat_Yuksekligi_m": [round(kat_yuksekligi, 2)],
+                        "Toplam_Alan_m2": [round(toplam_alan, 2)]
+                    }
+                    df_export = pd.DataFrame(csv_data)
+                    csv = df_export.to_csv(index=False).encode('utf-8')
+                    
                     st.download_button(
-                        "📄 Metraj Raporunu İndir (.txt)",
-                        report,
-                        file_name=f"metraj_raporu_{uploaded_file.name.replace('.dxf', '')}.txt",
-                        mime="text/plain"
+                        "📥 CSV İndir",
+                        data=csv,
+                        file_name=f"duvar_metraj_{uploaded.name.replace('.dxf', '')}.csv",
+                        mime="text/csv",
+                        use_container_width=True
                     )
-    
+                    
+                    # TXT RAPOR
+                    txt_rapor = f"""DUVAR METRAJ RAPORU
+==================
+Proje: {uploaded.name}
+Tarih: {pd.Timestamp.now().strftime('%Y-%m-%d %H:%M')}
+
+PARAMETRELER
+-----------
+Duvar Katmanı: {katman_secimi}
+Çizim Birimi: {birim}
+Kat Yüksekliği: {kat_yuksekligi} m
+
+SONUÇLAR
+--------
+İşlenen Objeler: {wall_data['entity_sayisi']} adet
+Ham Toplam Uzunluk: {wall_data['ham_uzunluk']:.2f} m
+Aks Uzunluğu (Ham/2): {wall_data['aks_uzunluk']:.2f} m
+Toplam Duvar Alanı: {toplam_alan:.2f} m²
+
+Hesaplayan: Barış Öker
+Firma: Fi-le Yazılım A.Ş.
+"""
+                    st.download_button(
+                        "📄 TXT Rapor İndir",
+                        data=txt_rapor,
+                        file_name=f"rapor_{uploaded.name.replace('.dxf', '.txt')}",
+                        mime="text/plain",
+                        use_container_width=True
+                    )
+            
+            # Temizlik
+            doc = None
+            try:
+                os.remove(tmp_path)
+            except:
+                pass
+                
+        except Exception as e:
+            st.error(f"❌ DXF işleme hatası: {str(e)}")
+            st.info("💡 Olası nedenler: Bozuk DXF, uyumsuz versiyon veya şifreli dosya")
     else:
-        # Henüz dosya yüklenmedi
-        st.info("👆 Lütfen bir DXF dosyası yükleyerek başlayın.")
+        st.info("👈 Lütfen sol menüden bir DXF dosyası yükleyin")
         
-        # Örnek bilgi kutusu
+        # Örnek açıklama
         st.markdown("""
         <div style="background-color: #e8f4f8; padding: 1.5rem; border-radius: 10px; margin-top: 2rem;">
-            <h4>💡 Nasıl Çalışır?</h4>
+            <h4>💡 Nasıl Kullanılır?</h4>
             <ol>
-                <li><strong>DXF Yükleyin:</strong> AutoCAD'de hazırladığınız mimari planı (.dxf) seçin.</li>
-                <li><strong>Katmanları Seçin:</strong> Sistem otomatik olarak tüm katmanları listeler.</li>
-                <li><strong>Duvar Katmanı:</strong> Duvar çizgilerinin olduğu katmanı seçin (çift çizgili).</li>
-                <li><strong>Zemin Katmanı:</strong> Kapalı alanların (odalar) olduğu katmanı seçin.</li>
-                <li><strong>Hesapla:</strong> Metraj otomatik hesaplanır ve plan önizlemesi gösterilir.</li>
+                <li><strong>DXF Yükleyin:</strong> AutoCAD'de hazırladığınız mimari planı seçin</li>
+                <li><strong>Katman Belirtin:</strong> Duvar çizgilerinin olduğu katman adını yazın (örn: "DUVAR")</li>
+                <li><strong>Birim Seçin:</strong> Çizimin hangi birimde olduğunu belirtin (cm, mm, m)</li>
+                <li><strong>Kat Yüksekliği:</strong> Metraj için kat yüksekliğini girin</li>
+                <li><strong>Hesapla:</strong> Sistem otomatik olarak:
+                    <ul>
+                        <li>Tüm çizgi uzunluklarını toplar</li>
+                        <li>2'ye bölerek aks uzunluğunu bulur (çift çizgili duvarlar için)</li>
+                        <li>Kat yüksekliği ile çarparak m² hesaplar</li>
+                    </ul>
+                </li>
             </ol>
-            <p><small><strong>Not:</strong> Her ARC (yay) objesi otomatik olarak bir kapı olarak sayılır.</small></p>
         </div>
         """, unsafe_allow_html=True)
-
-# =============================================================================
-# UYGULAMA BAŞLATMA
-# =============================================================================
-if __name__ == "__main__":
-    main()
