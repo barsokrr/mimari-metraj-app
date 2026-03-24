@@ -1,6 +1,5 @@
 import streamlit as st
 import ezdxf
-from ezdxf.bbox import Extents
 import matplotlib.pyplot as plt
 import math
 import tempfile
@@ -9,7 +8,7 @@ from roboflow import Roboflow
 from io import BytesIO
 
 # --- SAYFA AYARI ---
-st.set_page_config(page_title="Barış Öker - AI Metraj", layout="wide")
+st.set_page_config(page_title="Barış Öker - AI Metraj Pro", layout="wide")
 
 # --- 1. ROBOFLOW ANALİZ FONKSİYONU ---
 def get_ai_predictions(image_bytes):
@@ -28,7 +27,7 @@ def get_ai_predictions(image_bytes):
         st.error(f"AI Hatası: {e}")
         return []
 
-# --- 2. HİBRİT METRAJ HESAPLAMA ---
+# --- 2. HİBRİT METRAJ MOTORU ---
 def calculate_ai_guided_metraj(msp, predictions, img_width, img_height, dxf_bounds, h, div):
     total_wall_m2 = 0
     door_count = 0
@@ -38,20 +37,21 @@ def calculate_ai_guided_metraj(msp, predictions, img_width, img_height, dxf_boun
     dxf_h = max_y - min_y
 
     for p in predictions:
-        # Koordinat Dönüşümü
+        # Koordinat Dönüşümü (Piksel -> DXF)
         p_x = min_x + (p['x'] / img_width) * dxf_w
         p_y = min_y + (1 - (p['y'] / img_height)) * dxf_h
         p_w_dxf = (p['width'] / img_width) * dxf_w
         p_h_dxf = (p['height'] / img_height) * dxf_h
 
         if p['class'].lower() == 'duvar':
-            # AI'nın bulduğu kutu içindeki çizgileri tara
-            lines = msp.query(f'LINE LWPOLYLINE[x > {p_x - p_w_dxf/2} and x < {p_x + p_w_dxf/2}]')
+            # AI'nın işaret ettiği bölgedeki çizgileri sorgula
+            x_min, x_max = p_x - p_w_dxf/2, p_x + p_w_dxf/2
+            lines = msp.query(f'LINE LWPOLYLINE[x > {x_min} and x < {x_max}]')
             segment_len = 0
             for e in lines:
                 if e.dxftype() == "LINE":
                     segment_len += math.dist(e.dxf.start, e.dxf.end)
-                else:
+                elif e.dxftype() == "LWPOLYLINE":
                     pts = list(e.get_points())
                     segment_len += sum(math.dist(pts[i], pts[i+1]) for i in range(len(pts)-1))
             total_wall_m2 += ((segment_len / 2) / div) * h
@@ -78,25 +78,34 @@ if uploaded:
         doc = ezdxf.readfile(dxf_path)
         msp = doc.modelspace()
         
-        # Sınırları hesapla (Extents hatası düzeltildi)
-        try:
-            ext_obj = Extents(msp)
-            b_min, b_max = ext_obj.bbox[0], ext_obj.bbox[1]
-            dxf_bounds = (b_min[0], b_min[1], b_max[0], b_max[1])
-        except:
-            dxf_bounds = (0, 0, 1000, 1000)
+        # --- MANUEL BOUNDING BOX HESABI (ImportError Çözümü) ---
+        all_entities = msp.query('LINE LWPOLYLINE')
+        if all_entities:
+            # Tüm çizgilerin uç noktalarından sınırları kendimiz buluyoruz
+            x_coords = []
+            y_coords = []
+            for e in all_entities:
+                if e.dxftype() == "LINE":
+                    x_coords.extend([e.dxf.start.x, e.dxf.end.x])
+                    y_coords.extend([e.dxf.start.y, e.dxf.end.y])
+                else:
+                    pts = list(e.get_points())
+                    x_coords.extend([p[0] for p in pts])
+                    y_coords.extend([p[1] for p in pts])
+            dxf_bounds = (min(x_coords), min(y_coords), max(x_coords), max(y_coords))
+        else:
+            dxf_bounds = (0, 0, 100, 100)
 
-        # Çizim ve Görselleştirme
+        # Çizim
         fig, ax = plt.subplots(figsize=(8, 8), facecolor='#0e1117')
-        for e in msp.query('LINE LWPOLYLINE'):
+        for e in all_entities:
             pts = [e.dxf.start, e.dxf.end] if e.dxftype() == "LINE" else list(e.get_points())
             xs, ys = zip(*[(p[0], p[1]) for p in pts])
-            ax.plot(xs, ys, color="white", lw=0.8, alpha=0.6)
+            ax.plot(xs, ys, color="white", lw=0.7, alpha=0.5)
         ax.set_aspect("equal"); ax.axis("off")
         
         st.pyplot(fig)
         
-        # Analiz Butonu
         if st.button("🚀 Analizi Başlat"):
             img_buf = BytesIO()
             fig.savefig(img_buf, format='png', dpi=100)
@@ -112,5 +121,3 @@ if uploaded:
                 col3.metric("Pencere (AI)", w_c)
     
     os.remove(dxf_path)
-else:
-    st.info("Lütfen sol menüden bir DXF dosyası yükleyerek başlayın.")
