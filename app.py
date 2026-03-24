@@ -5,27 +5,30 @@ import pandas as pd
 import math
 import tempfile
 import os
+import subprocess
 from roboflow import Roboflow
 from io import BytesIO
 
-# --- 1. SAYFA AYARLARI VE TARZ ---
+# --- SAYFA AYARLARI ---
 st.set_page_config(page_title="SaaS Metraj Pro", layout="wide")
 
 st.markdown("""
 <style>
 .profile-area { text-align: center; padding: 10px; margin-bottom: 20px; }
-.profile-img { border-radius: 50%; width: 80px; height: 80px; object-fit: cover; border: 2px solid #FF4B4B; margin-bottom: 10px; }
+.profile-img { border-radius: 50%; width: 80px; height: 80px; object-fit: cover;
+border: 2px solid #FF4B4B; margin-bottom: 10px; }
 .user-name { font-weight: bold; font-size: 1.1em; color: white; margin-bottom: 0px; }
 .company-name { font-size: 0.9em; color: #888; margin-top: -5px; }
-.stButton>button { width: 100%; border-radius: 5px; height: 3em; background-color: #262730; color: white; }
+.stButton>button { width: 100%; border-radius: 5px; height: 3em;
+background-color: #262730; color: white; }
 .stDownloadButton>button { width: 100%; background-color: #00c853; color: white; }
 </style>
 """, unsafe_allow_html=True)
 
-# --- 2. ROBOFLOW AI ---
+# --- ROBOFLOW AI ---
 def run_roboflow_ai(image_bytes):
     try:
-        rf = Roboflow(api_key=st.secrets["my238ZSyFyxbwEVQHISP"])
+        rf = Roboflow(api_key=st.secrets["ROBO_API_KEY"])
         project = rf.workspace("bars-workspace-tcviv").project("mimari_duvar_tespiti-2")
         model = project.version(8).model
         with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
@@ -38,7 +41,25 @@ def run_roboflow_ai(image_bytes):
         st.error(f"AI doğrulama hatası: {ex}")
         return []
 
-# --- 3. DXF OKUMA & HESAPLAMA ---
+# --- DWG TO DXF DÖNÜŞÜM ---
+def convert_dwg_to_dxf(input_path):
+    """DWG dosyasını ODA Converter kullanarak geçici DXF'e çevirir"""
+    output_path = input_path.replace(".dwg", ".dxf")
+    try:
+        subprocess.run([
+            "ODAFileConverter", input_path, os.path.dirname(input_path),
+            "ACAD2013", "DXF", "0", "1", "0"
+        ], capture_output=True, check=True)
+        if os.path.exists(output_path):
+            return output_path
+        else:
+            st.error("DWG dosyası dönüştürülemedi! Lütfen manuel DXF yükleyin.")
+            return None
+    except Exception as ex:
+        st.error(f"DWG dönüşüm hatası: {ex}")
+        return None
+
+# --- DXF OKUMA & HESAPLAMA ---
 def clean_points(points, tol=1e-3):
     cleaned = [points[0]]
     for p in points[1:]:
@@ -69,7 +90,7 @@ def get_dxf_geometry(path, target_layers=None):
         st.error(f"DXF okunamadı: {ex}")
     return geometries
 
-# --- 4. GİRİŞ KONTROLÜ ---
+# --- UYGULAMA GİRİŞİ ---
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 
@@ -84,6 +105,8 @@ if not st.session_state.logged_in:
                 st.rerun()
             else:
                 st.error("Hatalı kullanıcı adı veya şifre!")
+
+# --- ANA UYGULAMA ---
 else:
     with st.sidebar:
         st.markdown(f"""
@@ -94,12 +117,12 @@ else:
         </div>
         """, unsafe_allow_html=True)
         st.write("---")
-        uploaded = st.file_uploader("DXF Dosyası Yükle", type=["dxf"])
+        uploaded = st.file_uploader("Plan Dosyası (.dxf / .dwg)", type=["dxf", "dwg"])
         katmanlar = st.text_input("Katman Filtresi (örn: DUVAR, PERDE)", "DUVAR")
         kat_yuk = st.number_input("Kat Yüksekliği (m)", 2.85, step=0.01)
         birim = st.selectbox("Çizim Birimi", ["cm", "mm", "m"], index=0)
         double_line = st.checkbox("Duvarlar çift çizgiyle çizilmiş", True)
-        st.markdown("<br>" * 3, unsafe_allow_html=True)
+        st.markdown("<br>"*3, unsafe_allow_html=True)
         if st.button("Çıkış Yap"):
             st.session_state.logged_in = False
             st.rerun()
@@ -107,17 +130,27 @@ else:
     st.title("🏗️ Metraj Analizi")
 
     if uploaded:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".dxf") as tmp:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=f".{uploaded.name.split('.')[-1]}") as tmp:
             tmp.write(uploaded.getbuffer())
             file_path = tmp.name
 
+        # --- DWG ise DXF'e dönüştür ---
+        if file_path.lower().endswith(".dwg"):
+            st.info("DWG dosyası algılandı, DXF'e dönüştürülüyor...")
+            dxf_path = convert_dwg_to_dxf(file_path)
+            if not dxf_path:
+                st.stop()
+            current_path = dxf_path
+        else:
+            current_path = file_path
+
         try:
             targets = [x.strip() for x in katmanlar.split(",") if x.strip()]
-            full_dxf = get_dxf_geometry(file_path)
-            walls = get_dxf_geometry(file_path, targets)
+            full_dxf = get_dxf_geometry(current_path)
+            walls = get_dxf_geometry(current_path, targets)
 
             if not walls:
-                st.warning("Seçilen katmanda duvar bulunamadı.")
+                st.warning("Seçilen katmanda eleman bulunamadı.")
             else:
                 raw_len = sum(math.dist(g[i], g[i+1]) for g in walls for i in range(len(g)-1))
                 bolen = 100 if birim == "cm" else 1000 if birim == "mm" else 1
@@ -180,7 +213,9 @@ else:
         finally:
             try:
                 os.remove(file_path)
+                if file_path.lower().endswith(".dwg") and os.path.exists(current_path):
+                    os.remove(current_path)
             except:
                 pass
     else:
-        st.info("Lütfen sol menüden bir DXF dosyası yükleyin.")
+        st.info("Lütfen sol menüden bir DXF veya DWG dosyası yükleyin.")
