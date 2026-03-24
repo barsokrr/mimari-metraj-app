@@ -5,92 +5,158 @@ import pandas as pd
 import math
 import tempfile
 import os
+from roboflow import Roboflow
+from io import BytesIO
 
-# --- 1. OTURUM VE SAYFA AYARI ---
+# --- 1. OTURUM KONTROLÜ VE SAYFA AYARI ---
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
-st.set_page_config(page_title="SaaS Metraj Pro - Barış Öker", layout="wide")
+st.set_page_config(page_title="SaaS Metraj Pro", layout="wide")
 
-# --- 2. ANALİZ FONKSİYONLARI ---
-def analyze_dxf(path, wall_layer="DUVAR", floor_layer="ZEMIN"):
+st.markdown("""
+<style>
+.profile-area { text-align: center; padding: 10px; margin-bottom: 20px; }
+.profile-img { border-radius: 50%; width: 80px; height: 80px; object-fit: cover; border: 2px solid #FF4B4B; margin-bottom: 10px; }
+.user-name { font-weight: bold; font-size: 1.1em; color: white; margin-bottom: 0px; }
+.company-name { font-size: 0.9em; color: #888; margin-top: -5px; }
+.stButton>button { width: 100%; border-radius: 5px; height: 3em; background-color: #262730; color: white; }
+.stDownloadButton>button { width: 100%; background-color: #00c853; color: white; }
+</style>
+""", unsafe_allow_html=True)
+
+# --- 2. YARDIMCI FONKSİYONLAR ---
+
+def run_roboflow_ai(image_bytes):
+    try:
+        rf = Roboflow(api_key="BURAYA_GERÇEK_API_KEYİNİ_YAZ")
+        project = rf.workspace("WORKSPACE_ADI").project("PROJE_ADI")
+        model = project.version(8).model
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
+            tmp.write(image_bytes.getvalue())
+            path = tmp.name
+        prediction = model.predict(path, confidence=0.4).json()
+        os.remove(path)
+        return prediction.get('predictions', [])
+    except Exception as ex:
+        st.error(f"AI doğrulama hatası: {ex}")
+        return []
+
+def get_dxf_geometry(path, target_layers=None):
+    geometries = []
     try:
         doc = ezdxf.readfile(path)
         msp = doc.modelspace()
-        
-        results = {
-            "wall_len": 0,
-            "floor_area": 0,
-            "door_count": 0, # ARC'lar buraya sayılacak
-            "entities": []
-        }
+        for e in msp.query('LINE LWPOLYLINE POLYLINE'):
+            if target_layers:
+                layer_name = e.dxf.layer.upper()
+                if not any(t.upper() in layer_name for t in target_layers):
+                    continue
 
-        # 1. DUVAR VE ZEMİN (Senin çalışan mantığın)
-        entities = msp.query('LINE LWPOLYLINE ARC') # ARC'ları da sorguya ekledik
-        
-        for e in entities:
-            # DUVAR UZUNLUĞU
-            if wall_layer.upper() in e.dxf.layer.upper():
-                if e.dxftype() == "LINE":
-                    results["wall_len"] += math.dist(e.dxf.start, e.dxf.end)
-                elif e.dxftype() == "LWPOLYLINE":
-                    pts = list(e.get_points())
-                    results["wall_len"] += sum(math.dist(pts[i], pts[i+1]) for i in range(len(pts)-1))
+            if e.dxftype() == "LINE":
+                geometries.append([(e.dxf.start[0], e.dxf.start[1]), (e.dxf.end[0], e.dxf.end[1])])
+            elif e.dxftype() in ("LWPOLYLINE", "POLYLINE"):
+                pts = [(p[0], p[1]) for p in e]
+                if len(pts) > 1:
+                    geometries.append(pts)
+    except Exception as ex:
+        st.error(f"DXF okunamadı: {ex}")
+    return geometries
 
-            # ZEMİN ALANI (Kapalı Poligonlar)
-            if floor_layer.upper() in e.dxf.layer.upper() and e.dxftype() == "LWPOLYLINE":
-                pts = [(p[0], p[1]) for p in e.get_points()]
-                if len(pts) > 2:
-                    area = 0.5 * abs(sum(pts[i][0]*pts[i+1][1] - pts[i+1][0]*pts[i][1] for i in range(len(pts)-1)) + (pts[-1][0]*pts[0][1] - pts[0][0]*pts[-1][1]))
-                    results["floor_area"] += area
+# --- 3. GİRİŞ EKRANI ---
+if not st.session_state.logged_in:
+    st.title("🏗️ Metraj Analiz Giriş")
+    with st.form("login_form"):
+        user_input = st.text_input("Kullanıcı Adı")
+        pass_input = st.text_input("Şifre", type="password")
+        if st.form_submit_button("Giriş Yap"):
+            if user_input == "admin" and pass_input == "1234":
+                st.session_state.logged_in = True
+                st.rerun()
+            else:
+                st.error("Hatalı kullanıcı adı veya şifre!")
 
-            # KAPI SAYIMI (ARC MANTIĞI)
-            # Mimari standartta kapı kanadı açılışı ARC ile çizilir.
-            if e.dxftype() == "ARC":
-                results["door_count"] += 1
-
-        return results, msp
-    except:
-        return None, None
-
-# --- 3. ANA EKRAN ---
-if st.session_state.logged_in or True: # Girişi şimdilik True tuttum
+# --- 4. ANA PROGRAM (Giriş Yapıldıysa) ---
+else:
     with st.sidebar:
-        st.markdown(f"**Barış Öker**\nFi-le Yazılım A.Ş.")
-        uploaded = st.file_uploader("DXF Yükle", type=["dxf"])
-        w_lay = st.text_input("Duvar Katmanı", "DUVAR")
-        f_lay = st.text_input("Zemin Katmanı", "ZEMIN")
-        kat_h = st.number_input("Kat Yüksekliği", 2.85)
-        birim = st.selectbox("Birim", ["cm", "mm", "m"])
-        div = {"cm": 100, "mm": 1000, "m": 1}[birim]
+        st.markdown(f"""
+            <div class="profile-area">
+                <img src="[w3schools.com](https://www.w3schools.com/howto/img_avatar.png)" class="profile-img">
+                <p class="user-name">admin</p>
+                <p class="company-name">Demo Firma</p>
+            </div>
+        """, unsafe_allow_html=True)
+        st.write("---")
+        uploaded = st.file_uploader("DXF Dosyası Yükle", type=["dxf"])
+        katmanlar = st.text_input("Katman Filtresi (örn: DUVAR, PERDE)", "DUVAR")
+        kat_yuk = st.number_input("Kat Yüksekliği (m)", value=2.85, step=0.01)
+        birim = st.selectbox("Çizim Birimi", ["cm", "mm", "m"], index=0)
+        st.markdown("<br>"*4, unsafe_allow_html=True)
+
+        if st.button("Çıkış Yap"):
+            st.session_state.logged_in = False
+            st.rerun()
+
+    st.title("🏗️ Metraj Analizi")
 
     if uploaded:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".dxf") as tmp:
             tmp.write(uploaded.getbuffer())
-            data, msp = analyze_dxf(tmp.name, w_lay, f_lay)
-        
-        if data:
-            # m2 ve Adet Hesapları
-            final_wall_m2 = ((data["wall_len"] / 2) / div) * kat_h
-            final_floor_m2 = data["floor_area"] / (div**2)
-            
-            # Sonuç Ekranı
-            c1, c2, c3 = st.columns(3)
-            c1.metric("Duvar Metrajı", f"{final_wall_m2:.2f} m²")
-            c2.metric("Zemin Metrajı", f"{final_floor_m2:.2f} m²")
-            c3.metric("Kapı Adedi (ARC)", data["door_count"])
+            file_path = tmp.name
 
-            # Plan Çizimi
-            fig, ax = plt.subplots(figsize=(10, 8), facecolor='#0e1117')
-            for e in msp.query('LINE LWPOLYLINE ARC'):
-                if e.dxftype() == "ARC":
-                    # Yayları çizmek biraz daha karmaşıktır ama görselde nokta olarak görebiliriz
-                    ax.plot(e.dxf.center[0], e.dxf.center[1], 'ro', markersize=2)
-                else:
-                    pts = [e.dxf.start, e.dxf.end] if e.dxftype() == "LINE" else list(e.get_points())
-                    xs, ys = zip(*[(p[0], p[1]) for p in pts])
-                    ax.plot(xs, ys, color="gray", lw=0.5, alpha=0.5)
-            ax.set_aspect("equal"); ax.axis("off")
-            st.pyplot(fig)
-        
-        os.remove(tmp.name)
+        try:
+            target_list = [x.strip() for x in katmanlar.split(",") if x.strip()]
+            full_project = get_dxf_geometry(file_path)
+            wall_analysis = get_dxf_geometry(file_path, target_list)
+
+            if wall_analysis:
+                raw_len = sum(math.dist(g[i], g[i+1]) for g in wall_analysis for i in range(len(g)-1))
+                bolen = 100 if birim == "cm" else (1000 if birim == "mm" else 1)
+                net_uzunluk = raw_len / bolen
+                toplam_alan = net_uzunluk * kat_yuk
+
+                col1, col2 = st.columns(2)
+                with col1:
+                    fig1, ax1 = plt.subplots(figsize=(10, 10), facecolor='#0e1117')
+                    for g in full_project:
+                        xs, ys = zip(*g)
+                        ax1.plot(xs, ys, color="gray", lw=0.5, alpha=0.5)
+                    ax1.set_aspect("equal"); ax1.axis("off")
+                    st.pyplot(fig1)
+
+                with col2:
+                    fig2, ax2 = plt.subplots(figsize=(10, 10), facecolor='#0e1117')
+                    for g in wall_analysis:
+                        xs, ys = zip(*g)
+                        ax2.plot(xs, ys, color="#FF4B4B", lw=1.5)
+                    ax2.set_aspect("equal"); ax2.axis("off")
+
+                    if st.button("🤖 AI ile Doğrula"):
+                        img_buf = BytesIO()
+                        fig2.savefig(img_buf, format='png')
+                        preds = run_roboflow_ai(img_buf)
+                        st.info(f"AI {len(preds)} adet eleman doğruladı.")
+
+                    st.pyplot(fig2)
+
+                st.divider()
+                st.metric("Toplam Uzunluk", f"{net_uzunluk:.2f} m")
+                st.metric("Toplam Alan", f"{toplam_alan:.2f} m²")
+
+                df = pd.DataFrame({
+                    "İmalat": ["Duvar Metrajı"],
+                    "Miktar": [round(toplam_alan, 2)],
+                    "Birim": ["m²"],
+                    "Kat Yüksekliği": [kat_yuk]
+                })
+                st.table(df)
+
+                csv = df.to_csv(index=False).encode('utf-8')
+                st.download_button("📥 Metraj Cetvelini İndir (CSV)", csv, "rapor.csv")
+            else:
+                st.warning("Seçilen katmanda çizim bulunamadı.")
+        finally:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+    else:
+        st.info("Lütfen sol menüden bir DXF dosyası yükleyin.")
