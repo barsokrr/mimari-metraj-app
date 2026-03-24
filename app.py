@@ -25,7 +25,7 @@ st.markdown("""
 # --- 2. ROBOFLOW AI ---
 def run_roboflow_ai(image_bytes):
     try:
-        rf = Roboflow(api_key=st.secrets["ROBO_API_KEY"])
+        rf = Roboflow(api_key=st.secrets["my238ZSyFyxbwEVQHISP"])
         project = rf.workspace("bars-workspace-tcviv").project("mimari_duvar_tespiti-2")
         model = project.version(8).model
         with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
