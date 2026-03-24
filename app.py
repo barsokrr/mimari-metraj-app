@@ -28,10 +28,10 @@ st.markdown("""
 # --- 2. YARDIMCI FONKSİYONLAR ---
 
 def run_roboflow_ai(image_bytes):
-    """Roboflow AI tahmini (isteğe bağlı doğrulama)"""
+    """Roboflow AI tahmini (Bars Workspace)"""
     try:
-        rf = Roboflow(api_key="my238ZSyFyxbwEVQHISP")
-        project = rf.workspace("WORKSPACE_ADI").project("PROJE_ADI")
+        rf = Roboflow(api_key=st.secrets["ROBO_API_KEY"])
+        project = rf.workspace("bars-workspace-tcviv").project("mimari_duvar_tespiti")
         model = project.version(8).model
         with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
             tmp.write(image_bytes.getvalue())
@@ -68,6 +68,7 @@ def get_dxf_geometry(path, target_layers=None):
         st.error(f"DXF okunamadı: {ex}")
     return geometries
 
+
 # --- 3. GİRİŞ EKRANI ---
 if not st.session_state.logged_in:
     st.title("🏗️ Metraj Analiz Giriş")
@@ -96,6 +97,7 @@ else:
         katmanlar = st.text_input("Katman Filtresi (örn: DUVAR, PERDE)", "DUVAR")
         kat_yuk = st.number_input("Kat Yüksekliği (m)", value=2.85, step=0.01)
         birim = st.selectbox("Çizim Birimi", ["cm", "mm", "m"], index=0)
+        double_line = st.checkbox("Duvarlar çift çizgi olarak çizilmiş", value=True)
         st.markdown("<br>"*4, unsafe_allow_html=True)
         if st.button("Çıkış Yap"):
             st.session_state.logged_in = False
@@ -117,8 +119,7 @@ else:
                 # --- Hesaplama ---
                 raw_len = sum(math.dist(g[i], g[i+1]) for g in wall_analysis for i in range(len(g)-1))
                 bolen = 100 if birim == "cm" else (1000 if birim == "mm" else 1)
-                # 👇 Çift çizgi duvarlar için /2 geri eklendi
-                net_uzunluk = (raw_len / 2) / bolen
+                net_uzunluk = (raw_len / 2 if double_line else raw_len) / bolen
                 toplam_alan = net_uzunluk * kat_yuk
 
                 # --- Görselleştirme ---
@@ -144,10 +145,21 @@ else:
                         img_buf = BytesIO()
                         fig2.savefig(img_buf, format='png')
                         preds = run_roboflow_ai(img_buf)
-                        st.info(f"AI {len(preds)} adet eleman doğruladı.")
-                    st.pyplot(fig2)
+                        
+                        # AI kutularını çiz
+                        for p in preds:
+                            x, y, w, h = p.get("x"), p.get("y"), p.get("width"), p.get("height")
+                            rect = plt.Rectangle(
+                                (x - w/2, y - h/2), w, h,
+                                edgecolor="lime", facecolor="none", lw=1.2
+                            )
+                            ax2.add_patch(rect)
+                        st.info(f"AI {len(preds)} adet duvar bölgesi tespit etti.")
+                        st.pyplot(fig2)
+                    else:
+                        st.pyplot(fig2)
 
-                # --- Çıktı ve Rapor ---
+                # --- Çıktı & Rapor ---
                 st.divider()
                 m1, m2 = st.columns(2)
                 m1.metric("Toplam Uzunluk", f"{net_uzunluk:.2f} m")
@@ -157,7 +169,8 @@ else:
                     "İmalat": ["Duvar Metrajı"],
                     "Miktar": [round(toplam_alan, 2)],
                     "Birim": ["m²"],
-                    "Kat Yüksekliği": [kat_yuk]
+                    "Kat Yüksekliği": [kat_yuk],
+                    "Duvar Tipi": ["Çift Çizgi" if double_line else "Tek Çizgi"]
                 })
                 st.table(df)
 
@@ -168,7 +181,10 @@ else:
                 st.warning("Seçilen katmanda çizim bulunamadı.")
 
         finally:
-            if os.path.exists(file_path):
-                os.remove(file_path)
+            try:
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+            except:
+                pass
     else:
         st.info("Lütfen sol menüden bir DXF dosyası yükleyin.")
