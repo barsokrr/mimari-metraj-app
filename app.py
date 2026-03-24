@@ -30,7 +30,7 @@ st.markdown("""
 def run_roboflow_ai(image_bytes):
     """Roboflow AI tahmini (isteğe bağlı doğrulama)"""
     try:
-        rf = Roboflow(api_key="BURAYA_GERÇEK_API_KEYİNİ_YAZ")
+        rf = Roboflow(api_key="my238ZSyFyxbwEVQHISP")
         project = rf.workspace("WORKSPACE_ADI").project("PROJE_ADI")
         model = project.version(8).model
         with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
