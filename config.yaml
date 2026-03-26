@@ -3,7 +3,7 @@ credentials:
     admin:
       email: "admin@example.com"
       name: "Admin Kullanıcı"
-      password: "123" # Bu şifreyi istediğinle değiştirebilirsin
+      password: "$2b$12$P/RXG9PXWaW6lV4KCEJlW03vxB/2veNLon6YUcoy/cqXXg4B8V5.O"  # ✅ Hashli şifre
 cookie:
   expiry_days: 30
   key: "super_secret_key_123"
