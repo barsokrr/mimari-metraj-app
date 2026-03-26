@@ -1,6 +1,6 @@
 """
 Mimari Duvar Metraj Uygulaması
-Geliştirici: Barış Öker - Fi-le Yazılım A.Ş.
+Geliştirici: Barış Öker - Fi-le Yazılım 
 Sürüm: 3.0 - Stabil & Minimal
 """
 import streamlit as st
@@ -35,8 +35,8 @@ if not st.session_state.logged_in:
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         with st.form("login"):
-            username = st.text_input("Kullanıcı Adı", value="admin")
-            password = st.text_input("Şifre", type="password", value="1234")
+            username = st.text_input("Kullanıcı Adı")
+            password = st.text_input("Şifre", type="password")
             if st.form_submit_button("Giriş Yap", use_container_width=True):
                 if username == "admin" and password == "1234":
                     st.session_state.logged_in = True
