@@ -1,10 +1,13 @@
 credentials:
   usernames:
     admin:
-      email: admin@example.com
-      name: Admin Kullanıcı
-      password: $2b$12$Jp05T9ay6KptrIrxzllDs.anqfnf8n.FLS.X0C8XAarx1lmpZ3l1C
+      email: "admin@example.com"
+      name: "Admin Kullanıcı"
+      password: "123" # Bu şifreyi istediğinle değiştirebilirsin
 cookie:
   expiry_days: 30
-  key: super_secret_key_123
-  name: streamlit_auth
+  key: "super_secret_key_123"
+  name: "mimari_metraj_auth"
+preauthorized:
+  emails:
+    - "admin@example.com"
