@@ -52,8 +52,8 @@ with st.sidebar:
     st.markdown("""
         <div class="profile-card">
             <img src="https://www.w3schools.com/howto/img_avatar.png" class="profile-img">
-            <h4 style="color: white; margin: 0;">Barış Öker</h4>
-            <p style="color: #888; margin: 0; font-size: 0.9em;">Fi-le Yazılım A.Ş.</p>
+            <h4 style="color: white; margin: 0;">Kullanıcı Adı</h4>
+            <p style="color: #888; margin: 0; font-size: 0.9em;">--</p>
         </div>
     """, unsafe_allow_html=True)
     
