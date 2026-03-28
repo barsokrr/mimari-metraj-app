@@ -14,7 +14,7 @@ import os
 # =============================================================================
 # SAYFA KONFİGÜRASYONU
 # =============================================================================
-st.set_page_config(page_title="Duvar Metraj Pro", layout="wide")
+st.set_page_config(page_title="inşaat Metraj Analizi", layout="wide")
 
 st.markdown("""
     <style>
