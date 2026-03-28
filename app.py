@@ -72,7 +72,7 @@ with st.sidebar:
 # =============================================================================
 # ANA UYGULAMA
 # =============================================================================
-st.title("🏗️ Duvar Metraj Analizi")
+st.title("🏗️ Metraj Analizi")
 
 if uploaded is None:
     st.info("👈 Lütfen sol menüden DXF dosyası yükleyin")
