@@ -117,8 +117,8 @@ try:
         except:
             continue
     
-    # SONUÇLAR - DÜZELTİLMİŞ HESAPLAMA
-    aks_uzunluk = total_length / birim_carpani
+    # SONUÇLAR
+    aks_uzunluk = (total_length / 2.0) / birim_carpani  # Çift çizgi / 2 + birim çevirimi
     toplam_alan = aks_uzunluk * kat_yuksekligi
     
     st.subheader("📊 Sonuçlar")
@@ -146,9 +146,8 @@ try:
                 ax.plot([s[0], e[0]], [s[1], e[1]], color=color, lw=lw)
             elif entity.dxftype() == "LWPOLYLINE":
                 pts = list(entity.get_points('xy'))
-                if len(pts) > 0:
-                    xs, ys = zip(*pts)
-                    ax.plot(xs, ys, color=color, lw=lw)
+                xs, ys = zip(*pts)
+                ax.plot(xs, ys, color=color, lw=lw)
         except:
             continue
     
