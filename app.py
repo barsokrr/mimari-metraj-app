@@ -1,7 +1,7 @@
 """
 Mimari Duvar Metraj Uygulaması - Profesyonel SaaS Sürümü
 Geliştirici: Barış Öker - Fi-le Yazılım 
-Özellik: Küçük Fontlu Yasal Metinler ve Sabitlenmiş Footer
+Özellik: Küçük Fontlu Yasal Metinler ve Ekranın En Altına Sabitlenmiş Footer
 """
 import streamlit as st
 import ezdxf
@@ -12,9 +12,7 @@ import tempfile
 import os
 from supabase import create_client
 
-# =============================================================================
-# VERİTABANI VE OTURUM AYARLARI
-# =============================================================================
+# --- VERİTABANI VE OTURUM AYARLARI ---
 try:
     url = st.secrets["supabase"]["url"]
     key = st.secrets["supabase"]["key"]
@@ -23,25 +21,24 @@ except Exception as e:
     st.error("Veritabanı anahtarları eksik! Lütfen Streamlit Secrets ayarlarını kontrol edin.")
     st.stop()
 
-# Sayfa Konfigürasyonu
 st.set_page_config(page_title="Duvar Metraj Pro", layout="wide", page_icon="🏗️")
 
-# Oturum Değişkenleri
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 if 'user_email' not in st.session_state:
     st.session_state.user_email = ""
 
 # =============================================================================
-# 🎨 ÖZEL CSS (Yazı Boyutları ve Sabit Footer)
+# 🎨 GELİŞMİŞ CSS (SABİT FOOTER VE KÜÇÜK FONT)
 # =============================================================================
 st.markdown("""
     <style>
     .stApp { background-color: #0e1117; }
     
-    /* Başlığı Ortala */
+    /* Giriş Başlığını Ortala */
     .centered-title {
         text-align: center;
+        margin-top: 5vh;
         margin-bottom: 2rem;
         font-weight: 700;
     }
@@ -52,21 +49,25 @@ st.markdown("""
         font-weight: 500 !important;
     }
     
-    /* Footer Çizgisi */
-    .footer-section {
-        margin-top: 50px;
-        padding-top: 20px;
-        border-top: 1px solid #333;
+    /* Footer Çizgisi ve Alanı */
+    .footer-container {
+        margin-top: 100px;
+        padding-bottom: 100px; /* Sabit footer için boşluk */
     }
     
-    /* En Alt Telif Yazısı (Sabitlenmiş Görünüm) */
+    /* EKranın En Altına Sabitlenmiş Telif Yazısı */
     .fixed-footer {
-        position: relative;
-        text-align: center;
-        padding: 40px 0 20px 0;
-        color: #666;
-        font-size: 11px;
+        position: fixed;
+        left: 0;
+        bottom: 0;
         width: 100%;
+        background-color: #0e1117;
+        color: #666;
+        text-align: center;
+        padding: 20px 0;
+        font-size: 11px;
+        border-top: 1px solid #333;
+        z-index: 999;
     }
     
     .profile-card { text-align: center; padding: 1rem; background-color: #1e2130; border-radius: 12px; border: 1px solid #333; margin-bottom: 1.5rem; }
@@ -74,9 +75,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# =============================================================================
-# YARDIMCI FONKSİYONLAR
-# =============================================================================
+# --- YARDIMCI FONKSİYONLAR ---
 def get_user_data(email):
     email = email.lower().strip()
     response = supabase.table("users").select("*").eq("email", email).execute()
@@ -98,7 +97,8 @@ def use_credit(email):
 # 🏢 YASAL FOOTER FONKSİYONU
 # =============================================================================
 def show_footer():
-    st.markdown('<div class="footer-section"></div>', unsafe_allow_html=True)
+    # Üstteki yasal kutular için konteyner
+    st.markdown('<div class="footer-container"></div>', unsafe_allow_html=True)
     
     # 3 Sütunlu Küçük Başlıklı Alan
     col_leg1, col_leg2, col_leg3 = st.columns(3)
@@ -115,7 +115,7 @@ def show_footer():
         with st.expander("🔄 İade Politikası"):
             st.write("Dijital ürünlerde cayma hakkı bulunmamaktadır. Teknik sorunlarda destekle iletişime geçiniz.")
     
-    # En Alt Telif Yazısı
+    # EKRANIN EN ALTINA ÇİVİLENMİŞ TELİF YAZISI
     st.markdown("""
         <div class="fixed-footer">
             © 2026 Fi-le Yazılım. Tüm hakları saklıdır. <br>
