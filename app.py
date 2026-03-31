@@ -93,7 +93,7 @@ def show_footer():
 # 1. GİRİŞ EKRANI (Login)
 # =============================================================================
 if not st.session_state.logged_in:
-    st.title("🏗️ Duvar Metraj Sistemi Giriş")
+    st.title("🏗️ İnşaat Metraj Sistemi Giriş")
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         email_input = st.text_input("E-posta Adresiniz", placeholder="ornek@mail.com")
