@@ -99,8 +99,7 @@ if not st.session_state.logged_in:
         else:
             st.error("Lütfen geçerli bir e-posta adresi girin.")
     
-    # Giriş ekranı bilgilendirme notu
-    st.info("ℹ️ **Şifresiz Erişim:** Biletleriniz e-posta adresinize tanımlanır. Şifre belirlemenize gerek kalmadan Supabase altyapısı ile güvenle giriş yapabilirsiniz.")
+    st.info("ℹ️ **Şifresiz Erişim:** Hesabınız e-posta adresinize tanımlanır. Güvenliğiniz için bilet haklarınız Supabase altyapısında e-postanızla eşleşmektedir; ek bir şifre gerekmez.")
     st.markdown('</div>', unsafe_allow_html=True)
     show_login_footer()
     st.stop()
@@ -216,19 +215,19 @@ if uploaded:
 else:
     st.info(f"Hoş geldiniz **{st.session_state.user_email}**. Başlamak için bir DXF dosyası yükleyin.")
 
-# --- BİLGİLENDİRME, SORUMLULUK VE FOOTER ---
+# --- FOOTER BİLGİLENDİRME VE SORUMLULUK NOTU ---
 st.markdown("""
     <hr style="border:0.1px solid #333; margin-top: 50px;">
     
     <div style="text-align: center; color: #64748B; font-size: 11px; margin-bottom: 20px; max-width: 800px; margin-left: auto; margin-right: auto; line-height: 1.4;">
-        🔐 <b>Hesap Yönetimi:</b> Sistemimiz şifre zorunluluğu olmadan e-posta tabanlı doğrulama ile çalışır. 
-        Kullanıcı verileriniz ve bilet haklarınız <b>Supabase</b> bulut altyapısında güvenli bir şekilde takip edilmektedir.
+        🔐 <b>Güvenlik Notu:</b> Sistemimizde hızlı erişim için e-posta tabanlı şifresiz giriş kullanılmaktadır. 
+        Tüm verileriniz ve bilet haklarınız <b>Supabase</b> bulut altyapısı ile sadece belirttiğiniz mail adresine tanımlanır.
     </div>
 
-    <div style="text-align: center; color: #888; font-size: 11px; margin-bottom: 15px; max-width: 750px; margin-left: auto; margin-right: auto; line-height: 1.5; background-color: #1e2130; padding: 12px; border-radius: 8px; border: 1px solid #333;">
-        ⚠️ <b>Önemli Not:</b> Hesaplanan metraj değerleri referans amaçlıdır ve kesinlik taşımaz. Orijinal çizimdeki eksik kısımlar, 
-        seçilmeyen katmanlar veya çizim hatalarından kaynaklanan metrajlar toplam sonuca dahil edilemez. 
-        Lütfen bu kısımları manuel olarak hesaplayıp toplam metraja ekleyiniz.
+    <div style="text-align: center; color: #888; font-size: 11px; margin-bottom: 15px; max-width: 750px; margin-left: auto; margin-right: auto; line-height: 1.5; background-color: #1e2130; padding: 12px; border-radius: 8px;">
+        ⚠️ <b>Önemli Not:</b> Hesaplanan metrajlar referans amaçlıdır. Orijinal çizimden eksik olan kısımların ve sistemde 
+        seçilmeyen duvarların metrajlarının manuel olarak hesaplanıp toplam metraja eklenmesi gerekmektedir. 
+        Metraj bilgileri teknik olarak %100 kesinlik garantisi taşımaz.
     </div>
 
     <div style="text-align: center; color: #555; font-size: 11px;">
