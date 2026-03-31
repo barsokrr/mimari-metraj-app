@@ -84,16 +84,7 @@ def show_footer():
         with st.expander("İade ve İptal Politikası"):
             st.write("Dijital ürünlerde cayma hakkı bulunmamaktadır. Teknik sorunlarda destekle iletişime geçiniz.")
             
-    with col_f2:
-        st.markdown("##### 📞 İletişim")
-        st.markdown(f"""
-            <table class="contact-table">
-                <tr><td class="label">Unvan</td><td>Fi-le Mimarlık & Yazılım</td></tr>
-                <tr><td class="label">Adres</td><td>[Vergi Levhası Adresi]</td></tr>
-                <tr><td class="label">E-posta</td><td>support@fi-le.com</td></tr>
-                <tr><td class="label">Vergi</td><td>[Daire] / [No]</td></tr>
-            </table>
-        """, unsafe_allow_html=True)
+
     
     st.divider()
     st.caption("© 2024 Fi-le Yazılım. Tüm hakları saklıdır. Bu uygulama mühendislik ön inceleme aracıdır.")
