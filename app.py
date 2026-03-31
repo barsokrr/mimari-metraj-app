@@ -118,7 +118,7 @@ def show_footer():
     # EKRANIN EN ALTINA ÇİVİLENMİŞ TELİF YAZISI
     st.markdown("""
         <div class="fixed-footer">
-            © 2026 Fi-le Yazılım. Tüm hakları saklıdır. <br>
+            © 2026 Fi-le Mimarlık ve Yazılım. Tüm hakları saklıdır. <br>
             Bu uygulama mühendislik ön inceleme aracıdır.DESTEK:barsokrr@gmail.com
         </div>
     """, unsafe_allow_html=True)
