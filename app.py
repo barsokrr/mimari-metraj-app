@@ -97,7 +97,7 @@ if not st.session_state.logged_in:
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         email_input = st.text_input("E-posta Adresiniz", placeholder="ornek@mail.com")
-        if st.button("Giriş Yap ve Kontrol Et", use_container_width=True):
+        if st.button("Giriş Yap", use_container_width=True):
             if "@" in email_input and "." in email_input:
                 user = get_user_data(email_input)
                 st.session_state.user_email = user["email"]
