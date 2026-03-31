@@ -33,7 +33,7 @@ st.markdown("""
     .centered-title { text-align: center; margin-top: 5vh !important; font-weight: 700; color: white; }
     .pushed-up-form { max-width: 400px; margin: -20px auto 0 auto !important; }
     
-    /* Profil Bilgi Kartı (Resimsiz Modern Versiyon) */
+    /* Profil Bilgi Kartı */
     .user-info-card {
         padding: 1.2rem;
         background-color: #1e2130;
@@ -89,6 +89,7 @@ if not st.session_state.logged_in:
     st.markdown('<h1 class="centered-title">🏗️ Duvar Metraj Sistemi Giriş</h1>', unsafe_allow_html=True)
     st.markdown('<div class="pushed-up-form">', unsafe_allow_html=True)
     email_input = st.text_input("E-posta Adresiniz", placeholder="ornek@mail.com")
+    
     if st.button("Giriş Yap ve Kontrol Et", use_container_width=True):
         if "@" in email_input and "." in email_input:
             user = get_user_data(email_input)
@@ -97,6 +98,9 @@ if not st.session_state.logged_in:
             st.rerun()
         else:
             st.error("Lütfen geçerli bir e-posta adresi girin.")
+    
+    # Giriş ekranı bilgilendirme notu
+    st.info("ℹ️ **Şifresiz Erişim:** Biletleriniz e-posta adresinize tanımlanır. Şifre belirlemenize gerek kalmadan Supabase altyapısı ile güvenle giriş yapabilirsiniz.")
     st.markdown('</div>', unsafe_allow_html=True)
     show_login_footer()
     st.stop()
@@ -109,7 +113,6 @@ bilet_sayisi = user_info['credits']
 has_credits = bilet_sayisi > 0
 
 with st.sidebar:
-    # --- RESİMSİZ YENİ KULLANICI BİLGİ KARTI ---
     st.markdown(f"""
         <div class="user-info-card">
             <div class="user-name">👤 {st.session_state.user_email.split('@')[0].capitalize()}</div>
@@ -213,12 +216,21 @@ if uploaded:
 else:
     st.info(f"Hoş geldiniz **{st.session_state.user_email}**. Başlamak için bir DXF dosyası yükleyin.")
 
-# --- YENİ EKLENEN UYARI VE FOOTER KISMI ---
+# --- BİLGİLENDİRME, SORUMLULUK VE FOOTER ---
 st.markdown("""
     <hr style="border:0.1px solid #333; margin-top: 50px;">
-    <div style="text-align: center; color: #888; font-size: 11px; margin-bottom: 15px; max-width: 700px; margin-left: auto; margin-right: auto; line-height: 1.5;">
-        ⚠️ <b>Önemli Not:</b> Hesaplanan metraj değerleri referans amaçlıdır ve %100 kesinlik taşımaz. Orijinal çizimdeki olası eksiklikler, çizim hataları veya filtrelenmeyen/seçilmeyen katmanlardaki duvarlar sisteme dahil edilemez. Lütfen bu kısımları manuel olarak hesaplayıp toplam metraja ekleyiniz.
+    
+    <div style="text-align: center; color: #64748B; font-size: 11px; margin-bottom: 20px; max-width: 800px; margin-left: auto; margin-right: auto; line-height: 1.4;">
+        🔐 <b>Hesap Yönetimi:</b> Sistemimiz şifre zorunluluğu olmadan e-posta tabanlı doğrulama ile çalışır. 
+        Kullanıcı verileriniz ve bilet haklarınız <b>Supabase</b> bulut altyapısında güvenli bir şekilde takip edilmektedir.
     </div>
+
+    <div style="text-align: center; color: #888; font-size: 11px; margin-bottom: 15px; max-width: 750px; margin-left: auto; margin-right: auto; line-height: 1.5; background-color: #1e2130; padding: 12px; border-radius: 8px; border: 1px solid #333;">
+        ⚠️ <b>Önemli Not:</b> Hesaplanan metraj değerleri referans amaçlıdır ve kesinlik taşımaz. Orijinal çizimdeki eksik kısımlar, 
+        seçilmeyen katmanlar veya çizim hatalarından kaynaklanan metrajlar toplam sonuca dahil edilemez. 
+        Lütfen bu kısımları manuel olarak hesaplayıp toplam metraja ekleyiniz.
+    </div>
+
     <div style="text-align: center; color: #555; font-size: 11px;">
         © 2026 Fi-le Mimarlık & Yazılım. Tüm hakları saklıdır.
     </div>
