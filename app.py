@@ -87,7 +87,7 @@ def show_footer():
 
     
     st.divider()
-    st.caption("© 2024 Fi-le Yazılım. Tüm hakları saklıdır. Bu uygulama mühendislik ön inceleme aracıdır.")
+    st.caption("© 2026 Fi-le Yazılım. Tüm hakları saklıdır. Bu uygulama mühendislik ön inceleme aracıdır.")
 
 # =============================================================================
 # 1. GİRİŞ EKRANI (Login)
