@@ -23,83 +23,16 @@ if 'logged_in' not in st.session_state:
 if 'user_email' not in st.session_state:
     st.session_state.user_email = ""
 
-# --- ÖZEL YEŞİL-BEYAZ CSS ---
+# --- PROFESYONEL CSS ---
 st.markdown("""
     <style>
-    /* Ana Uygulama Arka Planı - Beyaz */
-    .stApp { 
-        background-color: #FFFFFF; 
-    }
-    
-    /* Sol Menü (Sidebar) - RAL 6038 Yeşil Tonu */
-    [data-testid="stSidebar"] {
-        background-color: #00AD43 !important; /* RAL 6038 Yeşil */
-        border-right: 1px solid #E6E9EF;
-    }
-    
-    /* Sidebar İçindeki Yazılar Beyaz */
-    [data-testid="stSidebar"] .stMarkdown, 
-    [data-testid="stSidebar"] label, 
-    [data-testid="stSidebar"] p {
-        color: white !important;
-    }
-
-    /* Form Giriş Alanları ve Seçim Kutuları */
-    div[data-baseweb="input"], 
-    div[data-baseweb="select"], 
-    div[data-testid="stFileUploader"] {
-        background-color: #FFFFFF !important;
-        border-radius: 8px !important;
-    }
-
-    /* Başlıklar */
-    .centered-title { 
-        text-align: center; 
-        margin-top: 5vh !important; 
-        font-weight: 700; 
-        color: #1E1E1E; 
-    }
-
-    /* Profil Kartı */
-    .profile-card { 
-        text-align: center; 
-        padding: 1.5rem; 
-        background-color: rgba(255, 255, 255, 0.1); 
-        border-radius: 15px; 
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        margin-bottom: 1rem;
-    }
-    .profile-img { 
-        border-radius: 50%; 
-        width: 80px; 
-        height: 80px; 
-        border: 3px solid #FFFFFF; 
-        margin-bottom: 0.5rem; 
-    }
-    
-    /* Metrik Kutuları (Sağ paneldeki sonuçlar) */
-    [data-testid="stMetricValue"] {
-        color: #00AD43 !important;
-    }
-
-    /* Buton Tasarımları */
-    .stButton>button {
-        border-radius: 20px;
-        font-weight: 600;
-    }
-    
-    /* Footer */
-    .footer-fixed-section { 
-        position: fixed; 
-        left: 0; 
-        bottom: 0; 
-        width: 100%; 
-        background-color: #FFFFFF; 
-        padding: 15px 5%; 
-        border-top: 1px solid #E6E9EF; 
-        z-index: 999; 
-    }
-    .copyright-text { text-align: center; color: #888; font-size: 11px; }
+    .stApp { background-color: #0e1117; }
+    .centered-title { text-align: center; margin-top: 5vh !important; font-weight: 700; }
+    .pushed-up-form { max-width: 400px; margin: -20px auto 0 auto !important; }
+    .footer-fixed-section { position: fixed; left: 0; bottom: 0; width: 100%; background-color: #0e1117; padding: 20px 5% 15px 5%; border-top: 1px solid #333; z-index: 999; }
+    .copyright-text { text-align: center; color: #666; font-size: 11px; margin-top: 10px; }
+    .profile-card { text-align: center; padding: 1rem; background-color: #1e2130; border-radius: 12px; border: 1px solid #333; }
+    .profile-img { border-radius: 50%; width: 80px; height: 80px; border: 2px solid #FF4B4B; margin-bottom: 0.5rem; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -121,12 +54,26 @@ def use_credit(email):
         return True
     return False
 
+def show_login_footer():
+    st.markdown('<div class="footer-fixed-section">', unsafe_allow_html=True)
+    col_leg1, col_leg2, col_leg3 = st.columns(3)
+    with col_leg1:
+        with st.expander("🔐 Gizlilik ve KVKK"):
+            st.write("Verileriniz 6698 sayılı KVKK uyarınca korunmaktadır.")
+    with col_leg2:
+        with st.expander("📜 Satış Sözleşmesi"):
+            st.write("Dijital biletler anında ifa edilen hizmetlerdir.")
+    with col_leg3:
+        with st.expander("🔄 İade Politikası"):
+            st.write("Dijital ürünlerde cayma hakkı bulunmamaktadır.")
+    st.markdown('<div class="copyright-text">© 2026 Fi-le Mimarlık & Yazılım. Tüm hakları saklıdır. <br> Destek: barsokrr@gmail.com</div></div>', unsafe_allow_html=True)
+
 # =============================================================================
 # 1. GİRİŞ EKRANI
 # =============================================================================
 if not st.session_state.logged_in:
     st.markdown('<h1 class="centered-title">🏗️ Duvar Metraj Sistemi Giriş</h1>', unsafe_allow_html=True)
-    st.markdown('<div style="max-width: 400px; margin: 0 auto;">', unsafe_allow_html=True)
+    st.markdown('<div class="pushed-up-form">', unsafe_allow_html=True)
     email_input = st.text_input("E-posta Adresiniz", placeholder="ornek@mail.com")
     if st.button("Giriş Yap ve Kontrol Et", use_container_width=True):
         if "@" in email_input and "." in email_input:
@@ -137,6 +84,7 @@ if not st.session_state.logged_in:
         else:
             st.error("Lütfen geçerli bir e-posta adresi girin.")
     st.markdown('</div>', unsafe_allow_html=True)
+    show_login_footer()
     st.stop()
 
 # =============================================================================
@@ -150,8 +98,8 @@ with st.sidebar:
     st.markdown(f"""
         <div class="profile-card">
             <img src="https://api.dicebear.com/7.x/bottts/svg?seed={st.session_state.user_email}" class="profile-img">
-            <h4 style="color: white;">{st.session_state.user_email.split('@')[0]}</h4>
-            <p style="color: white; opacity: 0.9; font-weight:bold;">🎫 {bilet_sayisi} Bilet</p>
+            <h4>{st.session_state.user_email.split('@')[0]}</h4>
+            <p style="color:#FF4B4B; font-weight:bold;">🎫 {bilet_sayisi} Bilet</p>
         </div>
     """, unsafe_allow_html=True)
     
@@ -185,9 +133,9 @@ if uploaded:
                 doc = ezdxf.readfile(tmp_path)
                 msp = doc.modelspace()
                 
-                # --- GÖRSELLEŞTİRME (BEYAZ ZEMİN ÜZERİNE YEŞİL ANALİZ) ---
-                fig, ax = plt.subplots(figsize=(10, 8), facecolor='#FFFFFF')
-                ax.set_facecolor('#FFFFFF')
+                # --- GÖRSELLEŞTİRME ---
+                fig, ax = plt.subplots(figsize=(10, 8), facecolor='#0e1117')
+                ax.set_facecolor('#0e1117')
                 
                 total_length = 0.0
                 entity_count = 0
@@ -196,13 +144,13 @@ if uploaded:
                 for entity in msp:
                     try:
                         layer = getattr(entity.dxf, 'layer', '').upper()
-                        color = "#E0E0E0" # Diğer çizgiler açık gri
-                        lw = 0.3
+                        color = "#333333"
+                        lw = 0.5
                         
                         is_target = (mode == "🧱 Duvar Metrajı" and hedef_katman in layer)
                         if is_target:
-                            color = "#00AD43" # Duvarlar Yeşil (RAL 6038)
-                            lw = 1.2
+                            color = "#FF4B4B"
+                            lw = 1.5
 
                         if entity.dxftype() == "LINE":
                             s, e = entity.dxf.start, entity.dxf.end
@@ -224,7 +172,7 @@ if uploaded:
                 ax.set_aspect('equal')
                 ax.axis('off')
                 
-                # --- SONUÇLAR ---
+                # --- HESAPLAMA VE SONUÇLAR ---
                 st.balloons()
                 col_left, col_right = st.columns([2, 1])
                 
@@ -235,23 +183,27 @@ if uploaded:
                     if mode == "🧱 Duvar Metrajı":
                         birim_carpani = {"mm": 1000.0, "cm": 100.0, "m": 1.0}.get(birim, 100.0)
                         aks_uzunluk = (total_length / 2.0) / birim_carpani
+                        toplam_alan = aks_uzunluk * kat_yuksekligi
+                        
                         st.metric("📏 Aks Uzunluğu", f"{aks_uzunluk:.2f} m")
-                        st.metric("🧱 Toplam Alan", f"{(aks_uzunluk * kat_yuksekligi):.2f} m²")
+                        st.metric("🧱 Toplam Alan", f"{toplam_alan:.2f} m²")
+                        st.metric("🔢 Obje Sayısı", f"{entity_count} adet")
                     else:
                         blocks = msp.query('INSERT')
-                        counts = {b.dxf.name: 0 for b in blocks}
-                        for b in blocks: counts[b.dxf.name] += 1
-                        st.table(pd.DataFrame(list(counts.items()), columns=["Blok", "Adet"]))
+                        counts = {}
+                        for b in blocks: counts[b.dxf.name] = counts.get(b.dxf.name, 0) + 1
+                        df_res = pd.DataFrame(list(counts.items()), columns=["Blok Adı", "Adet"]).sort_values("Adet", ascending=False)
+                        st.table(df_res)
 
                 os.remove(tmp_path)
             except Exception as e:
                 st.error(f"Hata: {str(e)}")
 else:
-    st.info(f"Hoş geldiniz. Başlamak için sol menüden bir DXF dosyası yükleyin.")
+    st.info(f"Hoş geldiniz **{st.session_state.user_email}**. Başlamak için bir DXF dosyası yükleyin.")
 
 st.markdown("""
-    <div style="height: 100px;"></div>
-    <div class="footer-fixed-section">
-        <div class="copyright-text">© 2026 Fi-le Mimarlık & Yazılım. Tüm hakları saklıdır.</div>
+    <hr style="border:0.1px solid #333; margin-top: 50px;">
+    <div style="text-align: center; color: #666; font-size: 11px;">
+        © 2026 Fi-le Mimarlık & Yazılım. Tüm hakları saklıdır.
     </div>
 """, unsafe_allow_html=True)
