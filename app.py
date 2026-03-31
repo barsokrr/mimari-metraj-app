@@ -1,7 +1,7 @@
 """
 Mimari Duvar Metraj Uygulaması - Profesyonel SaaS Sürümü
 Geliştirici: Barış Öker - Fi-le Yazılım 
-Özellik: Tüm Yasal Bölümün Alta Sabitlenmesi
+Özellik: Küçük Fontlu Yasal Metinler ve Ekranın En Altına Sabitlenmiş Footer
 """
 import streamlit as st
 import ezdxf
@@ -29,7 +29,7 @@ if 'user_email' not in st.session_state:
     st.session_state.user_email = ""
 
 # =============================================================================
-# 🎨 PROFESYONEL CSS (TAM SABİT ALT BÖLÜM)
+# 🎨 GELİŞMİŞ CSS (SABİT FOOTER VE KÜÇÜK FONT)
 # =============================================================================
 st.markdown("""
     <style>
@@ -38,7 +38,7 @@ st.markdown("""
     /* Giriş Başlığını Ortala */
     .centered-title {
         text-align: center;
-        margin-top: 10vh;
+        margin-top: 5vh;
         margin-bottom: 2rem;
         font-weight: 700;
     }
@@ -49,28 +49,25 @@ st.markdown("""
         font-weight: 500 !important;
     }
     
-    /* TÜM YASAL BÖLÜMÜ ALTA SABİTLE */
-    .footer-fixed-section {
+    /* Footer Çizgisi ve Alanı */
+    .footer-container {
+        margin-top: 100px;
+        padding-bottom: 100px; /* Sabit footer için boşluk */
+    }
+    
+    /* EKranın En Altına Sabitlenmiş Telif Yazısı */
+    .fixed-footer {
         position: fixed;
         left: 0;
         bottom: 0;
         width: 100%;
         background-color: #0e1117;
-        padding: 20px 5% 10px 5%; /* Yanlardan boşluk */
+        color: #666;
+        text-align: center;
+        padding: 20px 0;
+        font-size: 11px;
         border-top: 1px solid #333;
         z-index: 999;
-    }
-    
-    .copyright-text {
-        text-align: center;
-        color: #666;
-        font-size: 11px;
-        margin-top: 15px;
-    }
-
-    /* Formun footer altında kalmaması için ana içeriğe boşluk ver */
-    .main-content-buffer {
-        margin-bottom: 250px;
     }
     
     .profile-card { text-align: center; padding: 1rem; background-color: #1e2130; border-radius: 12px; border: 1px solid #333; margin-bottom: 1.5rem; }
@@ -88,33 +85,41 @@ def get_user_data(email):
         return new_user
     return response.data[0]
 
+def use_credit(email):
+    user = get_user_data(email)
+    if user["credits"] > 0:
+        new_credits = user["credits"] - 1
+        supabase.table("users").update({"credits": new_credits}).eq("email", email).execute()
+        return True
+    return False
+
 # =============================================================================
-# 🏢 YASAL FOOTER FONKSİYONU (YENİ TASARIM)
+# 🏢 YASAL FOOTER FONKSİYONU
 # =============================================================================
 def show_footer():
-    # Streamlit bileşenlerini HTML içine gömmek yerine, 
-    # CSS class'ı ile sarmalanmış bir container yapısı kuruyoruz
-    st.markdown('<div class="footer-fixed-section">', unsafe_allow_html=True)
+    # Üstteki yasal kutular için konteyner
+    st.markdown('<div class="footer-container"></div>', unsafe_allow_html=True)
     
+    # 3 Sütunlu Küçük Başlıklı Alan
     col_leg1, col_leg2, col_leg3 = st.columns(3)
     
     with col_leg1:
         with st.expander("🔐 Gizlilik ve KVKK"):
-            st.write("Verileriniz 6698 sayılı KVKK uyarınca korunmaktadır.")
+            st.write("Verileriniz 6698 sayılı KVKK uyarınca korunmaktadır. DXF dosyaları analiz sonrası silinir.")
             
     with col_leg2:
         with st.expander("📜 Satış Sözleşmesi"):
-            st.write("Dijital biletler anında ifa edilen hizmetlerdir.")
+            st.write("Dijital biletler anında ifa edilen hizmetlerdir. Her bilet 1 analiz hakkı sağlar.")
             
     with col_leg3:
         with st.expander("🔄 İade Politikası"):
-            st.write("Dijital ürünlerde cayma hakkı bulunmamaktadır.")
-            
-    st.markdown(f"""
-        <div class="copyright-text">
+            st.write("Dijital ürünlerde cayma hakkı bulunmamaktadır. Teknik sorunlarda destekle iletişime geçiniz.")
+    
+    # EKRANIN EN ALTINA ÇİVİLENMİŞ TELİF YAZISI
+    st.markdown("""
+        <div class="fixed-footer">
             © 2026 Fi-le Yazılım. Tüm hakları saklıdır. <br>
             Bu uygulama mühendislik ön inceleme aracıdır.
-        </div>
         </div>
     """, unsafe_allow_html=True)
 
@@ -126,7 +131,6 @@ if not st.session_state.logged_in:
     
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        st.markdown('<div class="main-content-buffer">', unsafe_allow_html=True)
         email_input = st.text_input("E-posta Adresiniz", placeholder="ornek@mail.com")
         if st.button("Giriş Yap", use_container_width=True):
             if "@" in email_input and "." in email_input:
@@ -136,18 +140,64 @@ if not st.session_state.logged_in:
                 st.rerun()
             else:
                 st.error("Lütfen geçerli bir e-posta adresi girin.")
-        st.markdown('</div>', unsafe_allow_html=True)
     
     show_footer()
     st.stop()
 
 # =============================================================================
-# 2. ANALİZ PANELI
+# 2. ANALİZ PANELI (Dashboard)
 # =============================================================================
-# (Panel kısmı değişmedi, sadece en sonda show_footer() çağrısı kalacak)
-st.title("🏗️ Metraj Analiz Paneli")
-st.info(f"Hoş geldiniz {st.session_state.user_email}")
+user_info = get_user_data(st.session_state.user_email)
+bilet_sayisi = user_info['credits']
+has_credits = bilet_sayisi > 0
 
-# ... Mevcut Analiz Kodların ...
+with st.sidebar:
+    st.markdown(f"""
+        <div class="profile-card">
+            <img src="https://api.dicebear.com/7.x/bottts/svg?seed={st.session_state.user_email}" class="profile-img">
+            <h4>{st.session_state.user_email.split('@')[0]}</h4>
+            <p>🎫 {bilet_sayisi} Bilet</p>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    st.divider()
+    if has_credits:
+        uploaded = st.file_uploader("📁 DXF Dosyası Yükle", type=["dxf"])
+        katman_secimi = st.text_input("🧱 Duvar Katmanı", value="DUVAR")
+        kat_yuksekligi = st.number_input("📏 Kat Yüksekliği (m)", value=2.85, step=0.01)
+        birim = st.selectbox("📐 Çizim Birimi", ["cm", "mm", "m"], index=0)
+    else:
+        st.error("📉 Biletiniz Bulunmuyor")
+        st.link_button("💳 Hemen Bilet Al (99 TL)", "https://paytr.com/link-buraya", use_container_width=True)
+        uploaded = None
+
+    if st.button("🚪 Güvenli Çıkış", use_container_width=True):
+        st.session_state.logged_in = False
+        st.rerun()
+
+st.title("🏗️ Metraj Analiz Paneli")
+
+if not has_credits:
+    st.warning("### 🛑 Dosya Yükleme Kilitli")
+    st.write("Analiz yapmak için lütfen bilet satın alınız.")
+    st.stop()
+
+if uploaded is None:
+    st.info(f"Hoş geldiniz **{st.session_state.user_email}**. Lütfen sol taraftan analiz için DXF dosyasını yükleyin.")
+else:
+    try:
+        with st.spinner("Dosya analiz ediliyor..."):
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".dxf") as tmp:
+                tmp.write(uploaded.getvalue())
+                tmp_path = tmp.name
+            
+            # Analiz Motoru...
+            st.success(f"✅ Analiz Hazır: {uploaded.name}")
+            if st.button("📥 Analizi Onayla ve 1 Bilet Kullan", type="primary"):
+                if use_credit(st.session_state.user_email):
+                    st.balloons()
+            os.remove(tmp_path)
+    except Exception as e:
+        st.error(f"Hata: {e}")
 
 show_footer()
