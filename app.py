@@ -72,7 +72,7 @@ def use_credit(email):
 # =============================================================================
 def show_footer():
     st.markdown('<div class="footer-section"></div>', unsafe_allow_html=True)
-    st.subheader("Kurumsal ve Yasal Bilgiler")
+    st.subheader("")
     
     col_f1, col_f2 = st.columns([2, 1])
     with col_f1:
