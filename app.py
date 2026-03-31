@@ -72,16 +72,16 @@ def use_credit(email):
 # =============================================================================
 def show_footer():
     st.markdown('<div class="footer-section"></div>', unsafe_allow_html=True)
-    st.subheader("📄 Kurumsal ve Yasal Bilgiler")
+    st.subheader("Kurumsal ve Yasal Bilgiler")
     
     col_f1, col_f2 = st.columns([2, 1])
     with col_f1:
-        st.markdown("##### ⚖️ Mevzuat")
-        with st.expander("🔐 Gizlilik Politikası ve KVKK Metni"):
+        st.markdown("")
+        with st.expander("Gizlilik Politikası ve KVKK Metni"):
             st.write("Verileriniz 6698 sayılı KVKK uyarınca korunmaktadır. DXF dosyaları analiz sonrası silinir.")
-        with st.expander("📜 Mesafeli Satış Sözleşmesi"):
+        with st.expander("Mesafeli Satış Sözleşmesi"):
             st.write("Dijital biletler anında ifa edilen hizmetlerdir. Her bilet 1 analiz hakkı sağlar.")
-        with st.expander("🔄 İade ve İptal Politikası"):
+        with st.expander("İade ve İptal Politikası"):
             st.write("Dijital ürünlerde cayma hakkı bulunmamaktadır. Teknik sorunlarda destekle iletişime geçiniz.")
             
     with col_f2:
