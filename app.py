@@ -132,8 +132,8 @@ if not has_credits:
         Analiz yapmak ve rapor indirmek için bilet almanız gerekmektedir.
         
         **Neden bilet almalıyım?**
-        - Otomatik duvar metrajı hesabı.
-        - Detaylı aks uzunluğu ve m² raporu.
+        - Otomatik metrajı hesabı.
+        - Detaylı metrak raporu.
         - Görsel analiz çıktısı ve CSV indirme imkanı.
         """)
     with col2:
