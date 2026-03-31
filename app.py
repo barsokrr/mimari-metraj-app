@@ -46,7 +46,17 @@ st.markdown("""
 
     /* Alt Bilgi */
     .footer-fixed-section { position: fixed; left: 0; bottom: 0; width: 100%; background-color: #0e1117; padding: 20px 5% 15px 5%; border-top: 1px solid #333; z-index: 999; }
-    .copyright-text { text-align: center; color: #666; font-size: 11px; margin-top: 10px; }
+    .copyright-text { text-align: center; color: #666; font-size: 10px; margin-top: 10px; }
+    
+    /* Küçük Bilgi Notu Stili */
+    .small-info-text {
+        text-align: center;
+        color: #64748B;
+        font-size: 10px;
+        line-height: 1.4;
+        max-width: 800px;
+        margin: 10px auto;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -99,7 +109,8 @@ if not st.session_state.logged_in:
         else:
             st.error("Lütfen geçerli bir e-posta adresi girin.")
     
-    st.info("ℹ️ **Şifresiz Erişim:** Hesabınız e-posta adresinize tanımlanır. Güvenliğiniz için bilet haklarınız Supabase altyapısında e-postanızla eşleşmektedir; ek bir şifre gerekmez.")
+    # Giriş ekranı için küçük bilgi notu
+    st.markdown('<p class="small-info-text">ℹ️ Şifresiz Erişim: Hesabınız e-posta adresinize tanımlanır. Bilet haklarınız Supabase altyapısında e-postanızla eşleşmektedir; ek bir şifre gerekmez.</p>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
     show_login_footer()
     st.stop()
@@ -215,22 +226,22 @@ if uploaded:
 else:
     st.info(f"Hoş geldiniz **{st.session_state.user_email}**. Başlamak için bir DXF dosyası yükleyin.")
 
-# --- FOOTER BİLGİLENDİRME VE SORUMLULUK NOTU ---
+# --- KÜÇÜLTÜLMÜŞ BİLGİ VE FOOTER KISMI ---
 st.markdown("""
     <hr style="border:0.1px solid #333; margin-top: 50px;">
     
-    <div style="text-align: center; color: #64748B; font-size: 11px; margin-bottom: 20px; max-width: 800px; margin-left: auto; margin-right: auto; line-height: 1.4;">
+    <div class="small-info-text">
         🔐 <b>Güvenlik Notu:</b> Sistemimizde hızlı erişim için e-posta tabanlı şifresiz giriş kullanılmaktadır. 
         Tüm verileriniz ve bilet haklarınız <b>Supabase</b> bulut altyapısı ile sadece belirttiğiniz mail adresine tanımlanır.
     </div>
 
-    <div style="text-align: center; color: #888; font-size: 11px; margin-bottom: 15px; max-width: 750px; margin-left: auto; margin-right: auto; line-height: 1.5; background-color: #1e2130; padding: 12px; border-radius: 8px;">
+    <div style="text-align: center; color: #888; font-size: 9px; margin-bottom: 15px; max-width: 750px; margin-left: auto; margin-right: auto; line-height: 1.4; background-color: #1e2130; padding: 10px; border-radius: 6px;">
         ⚠️ <b>Önemli Not:</b> Hesaplanan metrajlar referans amaçlıdır. Orijinal çizimden eksik olan kısımların ve sistemde 
         seçilmeyen duvarların metrajlarının manuel olarak hesaplanıp toplam metraja eklenmesi gerekmektedir. 
         Metraj bilgileri teknik olarak %100 kesinlik garantisi taşımaz.
     </div>
 
-    <div style="text-align: center; color: #555; font-size: 11px;">
+    <div style="text-align: center; color: #555; font-size: 10px;">
         © 2026 Fi-le Mimarlık & Yazılım. Tüm hakları saklıdır.
     </div>
 """, unsafe_allow_html=True)
