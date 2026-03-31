@@ -1,10 +1,11 @@
 """
-Mimari Metraj Uygulaması - Profesyonel SaaS Sürümü
+Mimari Duvar Metraj Uygulaması - Profesyonel SaaS Sürümü
 Geliştirici: Barış Öker - Fi-le Mimarlık & Yazılım
-Özellikler: Duvar Metrajı + Kapı/Pencere Sayımı + 200 TL Biletleme
+Güncelleme: Analiz Panelinden Yasal Metinler Kaldırıldı
 """
 import streamlit as st
 import ezdxf
+import matplotlib.pyplot as plt
 import pandas as pd
 import math
 import tempfile
@@ -17,7 +18,7 @@ try:
     key = st.secrets["supabase"]["key"]
     supabase = create_client(url, key)
 except Exception as e:
-    st.error("Veritabanı anahtarları eksik! Lütfen Streamlit Secrets ayarlarını kontrol edin.")
+    st.error("Veritabanı anahtarları eksik!")
     st.stop()
 
 st.set_page_config(page_title="Duvar Metraj Pro", layout="wide", page_icon="🏗️")
@@ -48,7 +49,9 @@ st.markdown("""
 
     .footer-fixed-section {
         position: fixed;
-        left: 0; bottom: 0; width: 100%;
+        left: 0;
+        bottom: 0;
+        width: 100%;
         background-color: #0e1117;
         padding: 20px 5% 15px 5%;
         border-top: 1px solid #333;
@@ -85,42 +88,7 @@ def use_credit(email):
         return True
     return False
 
-def analyze_dxf(file_path, mode, layer_name=None, height=2.85):
-    """DXF Analiz Motoru"""
-    doc = ezdxf.readfile(file_path)
-    msp = doc.modelspace()
-    
-    if mode == "🧱 Duvar Metrajı":
-        entities = msp.query(f'*[layer=="{layer_name}"]')
-        total_len = 0
-        for e in entities:
-            if e.dxftype() == 'LINE':
-                total_len += math.sqrt((e.dxf.start.x - e.dxf.end.x)**2 + (e.dxf.start.y - e.dxf.end.y)**2)
-            elif e.dxftype() == 'LWPOLYLINE':
-                points = e.get_points()
-                for i in range(len(points)-1):
-                    total_len += math.sqrt((points[i][0] - points[i+1][0])**2 + (points[i][1] - points[i+1][1])**2)
-        
-        # Basit bir birim düzeltme (Örn: cm çizildiyse m'ye çevir - Projeye göre ayarlanabilir)
-        area = total_len * height
-        return pd.DataFrame({
-            "Analiz": ["Toplam Uzunluk", "Toplam Duvar Alanı"],
-            "Değer": [round(total_len, 2), round(area, 2)],
-            "Birim": ["m", "m²"]
-        })
-
-    elif mode == "🚪 Kapı/Pencere Sayımı":
-        blocks = msp.query('INSERT')
-        counts = {}
-        for b in blocks:
-            name = b.dxf.name
-            counts[name] = counts.get(name, 0) + 1
-        
-        if not counts:
-            return pd.DataFrame(columns=["Blok Adı", "Adet"])
-        
-        return pd.DataFrame(list(counts.items()), columns=["Blok Adı", "Adet"]).sort_values("Adet", ascending=False)
-
+# --- GİRİŞ EKRANI İÇİN FOOTER ---
 def show_login_footer():
     st.markdown('<div class="footer-fixed-section">', unsafe_allow_html=True)
     col_leg1, col_leg2, col_leg3 = st.columns(3)
@@ -133,13 +101,21 @@ def show_login_footer():
     with col_leg3:
         with st.expander("🔄 İade Politikası"):
             st.write("Dijital ürünlerde cayma hakkı bulunmamaktadır.")
-    st.markdown("""<div class="copyright-text">© 2026 Fi-le Mimarlık & Yazılım. Tüm hakları saklıdır. <br> Destek: barsokrr@gmail.com</div></div>""", unsafe_allow_html=True)
+    
+    st.markdown("""
+        <div class="copyright-text">
+            © 2026 Fi-le Mimarlık & Yazılım. Tüm hakları saklıdır. <br>
+            Destek: barsokrr@gmail.com | Bu uygulama mühendislik ön inceleme aracıdır.
+        </div>
+        </div>
+    """, unsafe_allow_html=True)
 
 # =============================================================================
 # 1. GİRİŞ EKRANI
 # =============================================================================
 if not st.session_state.logged_in:
     st.markdown('<h1 class="centered-title">🏗️ Duvar Metraj Sistemi Giriş</h1>', unsafe_allow_html=True)
+    
     st.markdown('<div class="pushed-up-form">', unsafe_allow_html=True)
     email_input = st.text_input("E-posta Adresiniz", placeholder="ornek@mail.com")
     if st.button("Giriş Yap ve Kontrol Et", use_container_width=True):
@@ -151,6 +127,7 @@ if not st.session_state.logged_in:
         else:
             st.error("Lütfen geçerli bir e-posta adresi girin.")
     st.markdown('</div>', unsafe_allow_html=True)
+    
     show_login_footer()
     st.stop()
 
@@ -161,6 +138,7 @@ user_info = get_user_data(st.session_state.user_email)
 bilet_sayisi = user_info['credits']
 has_credits = bilet_sayisi > 0
 
+# Sidebar Düzeni
 with st.sidebar:
     st.markdown(f"""
         <div class="profile-card">
@@ -173,14 +151,8 @@ with st.sidebar:
     st.divider()
     if has_credits:
         uploaded = st.file_uploader("📁 DXF Dosyası Yükle", type=["dxf"])
-        # MOD SEÇİMİ
-        analiz_modu = st.selectbox("🎯 Analiz Tipi", ["🧱 Duvar Metrajı", "🚪 Kapı/Pencere Sayımı"])
-        
-        if analiz_modu == "🧱 Duvar Metrajı":
-            katman_secimi = st.text_input("🧱 Duvar Katmanı", value="DUVAR")
-            kat_yuksekligi = st.number_input("📏 Kat Yüksekliği (m)", value=2.85, step=0.01)
-        else:
-            st.info("💡 Projedeki tüm bloklar isimlerine göre adet bazlı sayılacaktır.")
+        katman_secimi = st.text_input("🧱 Duvar Katmanı", value="DUVAR")
+        kat_yuksekligi = st.number_input("📏 Kat Yüksekliği (m)", value=2.85, step=0.01)
     else:
         st.error("📉 Analiz Hakkınız Kalmadı")
         st.link_button("💳 Hemen Bilet Al (200 TL)", "https://paytr.com/link-buraya", use_container_width=True)
@@ -190,6 +162,7 @@ with st.sidebar:
         st.session_state.logged_in = False
         st.rerun()
 
+# Ana Panel İçeriği
 st.title("🏗️ Metraj Analiz Paneli")
 
 if not has_credits:
@@ -197,28 +170,15 @@ if not has_credits:
     st.write("Analiz yapabilmek için bilet satın almanız gerekmektedir.")
 else:
     if uploaded:
-        st.success(f"✅ Dosya Hazır: {uploaded.name} | Mod: {analiz_modu}")
+        st.success(f"✅ Dosya Hazır: {uploaded.name}")
         if st.button("📥 Analizi Başlat (1 Bilet)", type="primary"):
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".dxf") as tmp:
-                tmp.write(uploaded.getvalue())
-                tmp_path = tmp.name
-            
-            try:
-                if use_credit(st.session_state.user_email):
-                    if analiz_modu == "🧱 Duvar Metrajı":
-                        res = analyze_dxf(tmp_path, analiz_modu, katman_secimi, kat_yuksekligi)
-                    else:
-                        res = analyze_dxf(tmp_path, analiz_modu)
-                    
-                    st.balloons()
-                    st.subheader(f"📊 {analiz_modu} Sonuçları")
-                    st.dataframe(res, use_container_width=True)
-                os.remove(tmp_path)
-            except Exception as e:
-                st.error(f"Analiz sırasında hata oluştu: {e}")
+            if use_credit(st.session_state.user_email):
+                st.balloons()
+                st.rerun()
     else:
-        st.info(f"Hoş geldiniz **{st.session_state.user_email}**. Lütfen sol taraftan bir DXF dosyası yükleyip analiz tipini seçin.")
+        st.info(f"Hoş geldiniz **{st.session_state.user_email}**. Lütfen sol taraftan bir DXF dosyası yükleyerek başlayın.")
 
+# ALT KISIMDAKİ YASAL METİNLER KALDIRILDI, SADECE TELİF YAZISI BIRAKILDI
 st.markdown("""
     <hr style="border:0.1px solid #333; margin-top: 50px;">
     <div style="text-align: center; color: #666; font-size: 11px;">
