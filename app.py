@@ -1,4 +1,3 @@
-Siz şunu dediniz:
 """
 Mimari Duvar Metraj Uygulaması - Profesyonel SaaS Sürümü
 Geliştirici: Barış Öker - Fi-le Yazılım 
