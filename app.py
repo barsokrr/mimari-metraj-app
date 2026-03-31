@@ -132,8 +132,8 @@ if not has_credits:
         Analiz yapmak ve rapor indirmek için bilet almanız gerekmektedir.
         
         **Neden bilet almalıyım?**
-        - Otomatik metrajı hesabı.
-        - Detaylı metrak raporu.
+        - Otomatik metraj hesabı.
+        - Detaylı metraj raporu.
         - Görsel analiz çıktısı ve CSV indirme imkanı.
         """)
     with col2:
