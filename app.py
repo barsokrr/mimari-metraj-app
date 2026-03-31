@@ -1,7 +1,7 @@
 """
 Mimari Duvar Metraj Uygulaması - Profesyonel SaaS Sürümü
 Geliştirici: Barış Öker - Fi-le Mimarlık & Yazılım
-Özellik: 200 TL Fiyat Güncellemesi ve Sabit Footer
+Güncelleme: Analiz Panelinden Yasal Metinler Kaldırıldı
 """
 import streamlit as st
 import ezdxf
@@ -88,8 +88,8 @@ def use_credit(email):
         return True
     return False
 
-# --- FOOTER ---
-def show_footer():
+# --- GİRİŞ EKRANI İÇİN FOOTER ---
+def show_login_footer():
     st.markdown('<div class="footer-fixed-section">', unsafe_allow_html=True)
     col_leg1, col_leg2, col_leg3 = st.columns(3)
     with col_leg1:
@@ -128,16 +128,17 @@ if not st.session_state.logged_in:
             st.error("Lütfen geçerli bir e-posta adresi girin.")
     st.markdown('</div>', unsafe_allow_html=True)
     
-    show_footer()
+    show_login_footer()
     st.stop()
 
 # =============================================================================
-# 2. ANALİZ PANELI
+# 2. ANALİZ PANELI (Dashboard)
 # =============================================================================
 user_info = get_user_data(st.session_state.user_email)
 bilet_sayisi = user_info['credits']
 has_credits = bilet_sayisi > 0
 
+# Sidebar Düzeni
 with st.sidebar:
     st.markdown(f"""
         <div class="profile-card">
@@ -154,7 +155,6 @@ with st.sidebar:
         kat_yuksekligi = st.number_input("📏 Kat Yüksekliği (m)", value=2.85, step=0.01)
     else:
         st.error("📉 Analiz Hakkınız Kalmadı")
-        # BURAYI 200 TL OLARAK GÜNCELLEDİM
         st.link_button("💳 Hemen Bilet Al (200 TL)", "https://paytr.com/link-buraya", use_container_width=True)
         uploaded = None
 
@@ -162,18 +162,26 @@ with st.sidebar:
         st.session_state.logged_in = False
         st.rerun()
 
+# Ana Panel İçeriği
 st.title("🏗️ Metraj Analiz Paneli")
 
 if not has_credits:
     st.warning("### 🛑 Bakiyeniz Yetersiz")
     st.write("Analiz yapabilmek için bilet satın almanız gerekmektedir.")
-    st.stop()
+else:
+    if uploaded:
+        st.success(f"✅ Dosya Hazır: {uploaded.name}")
+        if st.button("📥 Analizi Başlat (1 Bilet)", type="primary"):
+            if use_credit(st.session_state.user_email):
+                st.balloons()
+                st.rerun()
+    else:
+        st.info(f"Hoş geldiniz **{st.session_state.user_email}**. Lütfen sol taraftan bir DXF dosyası yükleyerek başlayın.")
 
-if uploaded:
-    st.success(f"✅ Dosya Hazır: {uploaded.name}")
-    if st.button("📥 Analizi Başlat (1 Bilet)", type="primary"):
-        if use_credit(st.session_state.user_email):
-            st.balloons()
-            st.rerun()
-
-show_footer()
+# ALT KISIMDAKİ YASAL METİNLER KALDIRILDI, SADECE TELİF YAZISI BIRAKILDI
+st.markdown("""
+    <hr style="border:0.1px solid #333; margin-top: 50px;">
+    <div style="text-align: center; color: #666; font-size: 11px;">
+        © 2026 Fi-le Yazılım. Tüm hakları saklıdır. Bu uygulama bir mühendislik ön inceleme aracıdır.
+    </div>
+""", unsafe_allow_html=True)
