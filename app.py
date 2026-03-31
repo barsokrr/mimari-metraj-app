@@ -1,7 +1,7 @@
 """
 Mimari Duvar Metraj Uygulaması - Profesyonel SaaS Sürümü
-Geliştirici: Barış Öker - Fi-le Yazılım 
-Özellik: Küçük Fontlu Yasal Metinler ve Ekranın En Altına Sabitlenmiş Footer
+Geliştirici: Barış Öker - Fi-le Mimarlık & Yazılım
+Özellik: Sabitlenmiş Yasal Bilgiler ve Güncel İletişim Verileri
 """
 import streamlit as st
 import ezdxf
@@ -29,16 +29,15 @@ if 'user_email' not in st.session_state:
     st.session_state.user_email = ""
 
 # =============================================================================
-# 🎨 GELİŞMİŞ CSS (SABİT FOOTER VE KÜÇÜK FONT)
+# 🎨 PROFESYONEL CSS (SABİT ALT BÖLÜM)
 # =============================================================================
 st.markdown("""
     <style>
     .stApp { background-color: #0e1117; }
     
-    /* Giriş Başlığını Ortala */
     .centered-title {
         text-align: center;
-        margin-top: 5vh;
+        margin-top: 8vh;
         margin-bottom: 2rem;
         font-weight: 700;
     }
@@ -49,25 +48,29 @@ st.markdown("""
         font-weight: 500 !important;
     }
     
-    /* Footer Çizgisi ve Alanı */
-    .footer-container {
-        margin-top: 100px;
-        padding-bottom: 100px; /* Sabit footer için boşluk */
-    }
-    
-    /* EKranın En Altına Sabitlenmiş Telif Yazısı */
-    .fixed-footer {
+    /* TÜM YASAL BÖLÜMÜ ALTA SABİTLE */
+    .footer-fixed-section {
         position: fixed;
         left: 0;
         bottom: 0;
         width: 100%;
         background-color: #0e1117;
-        color: #666;
-        text-align: center;
-        padding: 20px 0;
-        font-size: 11px;
+        padding: 20px 5% 15px 5%;
         border-top: 1px solid #333;
         z-index: 999;
+    }
+    
+    .copyright-text {
+        text-align: center;
+        color: #666;
+        font-size: 11px;
+        margin-top: 15px;
+        line-height: 1.6;
+    }
+
+    /* İçeriğin footer altında kalmaması için buffer */
+    .main-content-buffer {
+        margin-bottom: 280px;
     }
     
     .profile-card { text-align: center; padding: 1rem; background-color: #1e2130; border-radius: 12px; border: 1px solid #333; margin-bottom: 1.5rem; }
@@ -94,13 +97,12 @@ def use_credit(email):
     return False
 
 # =============================================================================
-# 🏢 YASAL FOOTER FONKSİYONU
+# 🏢 YASAL FOOTER FONKSİYONU (GÜNCEL BİLGİLERLE)
 # =============================================================================
 def show_footer():
-    # Üstteki yasal kutular için konteyner
-    st.markdown('<div class="footer-container"></div>', unsafe_allow_html=True)
+    # Yasal kutuları ve telif yazısını içeren sabit konteyner
+    st.markdown('<div class="footer-fixed-section">', unsafe_allow_html=True)
     
-    # 3 Sütunlu Küçük Başlıklı Alan
     col_leg1, col_leg2, col_leg3 = st.columns(3)
     
     with col_leg1:
@@ -115,11 +117,12 @@ def show_footer():
         with st.expander("🔄 İade Politikası"):
             st.write("Dijital ürünlerde cayma hakkı bulunmamaktadır. Teknik sorunlarda destekle iletişime geçiniz.")
     
-    # EKRANIN EN ALTINA ÇİVİLENMİŞ TELİF YAZISI
+    # GÜNCEL İLETİŞİM VE TELİF YAZISI
     st.markdown("""
-        <div class="fixed-footer">
-            © 2026 Fi-le Yazılım. Tüm hakları saklıdır. <br>
-            Bu uygulama mühendislik ön inceleme aracıdır.
+        <div class="copyright-text">
+            © 2026 Fi-le Mimarlık & Yazılım. Tüm hakları saklıdır. <br>
+            Destek: barsokrr@gmail.com | Bu uygulama mühendislik ön inceleme aracıdır.
+        </div>
         </div>
     """, unsafe_allow_html=True)
 
@@ -131,6 +134,7 @@ if not st.session_state.logged_in:
     
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
+        st.markdown('<div class="main-content-buffer">', unsafe_allow_html=True)
         email_input = st.text_input("E-posta Adresiniz", placeholder="ornek@mail.com")
         if st.button("Giriş Yap", use_container_width=True):
             if "@" in email_input and "." in email_input:
@@ -140,6 +144,7 @@ if not st.session_state.logged_in:
                 st.rerun()
             else:
                 st.error("Lütfen geçerli bir e-posta adresi girin.")
+        st.markdown('</div>', unsafe_allow_html=True)
     
     show_footer()
     st.stop()
@@ -191,7 +196,6 @@ else:
                 tmp.write(uploaded.getvalue())
                 tmp_path = tmp.name
             
-            # Analiz Motoru...
             st.success(f"✅ Analiz Hazır: {uploaded.name}")
             if st.button("📥 Analizi Onayla ve 1 Bilet Kullan", type="primary"):
                 if use_credit(st.session_state.user_email):
@@ -200,4 +204,6 @@ else:
     except Exception as e:
         st.error(f"Hata: {e}")
 
+# Sayfa sonu boşluğu ve footer
+st.markdown('<div class="main-content-buffer"></div>', unsafe_allow_html=True)
 show_footer()
