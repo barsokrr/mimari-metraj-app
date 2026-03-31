@@ -1,7 +1,7 @@
 """
 Mimari Duvar Metraj Uygulaması - Profesyonel SaaS Sürümü
 Geliştirici: Barış Öker - Fi-le Yazılım 
-Özellik: Giriş Ekranında Yasal Metinler + Temiz Arayüz
+Özellik: Ortalanmış Giriş ve Yan Yana Yasal Metinler
 """
 import streamlit as st
 import ezdxf
@@ -33,17 +33,25 @@ if 'user_email' not in st.session_state:
     st.session_state.user_email = ""
 
 # =============================================================================
-# 🎨 PROFESYONEL CSS (Giriş Ekranı ve Footer Odaklı)
+# 🎨 PROFESYONEL CSS
 # =============================================================================
 st.markdown("""
     <style>
     .stApp { background-color: #0e1117; }
+    
+    /* Başlığı Ortala */
+    .centered-title {
+        text-align: center;
+        margin-bottom: 2rem;
+        font-weight: 700;
+    }
+    
     .profile-card { text-align: center; padding: 1rem; background-color: #1e2130; border-radius: 12px; border: 1px solid #333; margin-bottom: 1.5rem; }
     .profile-img { border-radius: 50%; width: 90px; height: 90px; border: 3px solid #FF4B4B; margin-bottom: 0.5rem; }
-    .footer-section { margin-top: 80px; padding-top: 40px; border-top: 1px solid #333; }
-    .contact-table { width: 100%; color: #ddd; font-size: 0.9em; }
-    .contact-table td { padding: 5px 0; }
-    .label { color: #888; width: 100px; }
+    .footer-section { margin-top: 80px; padding-top: 20px; border-top: 1px solid #333; }
+    
+    /* Expander başlıklarını biraz daha küçük yapalım yan yana sığması için */
+    .st-emotion-cache-p5mtransition { font-size: 14px; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -68,23 +76,25 @@ def use_credit(email):
     return False
 
 # =============================================================================
-# 🏢 YASAL FOOTER FONKSİYONU (Tekrarı önlemek için)
+# 🏢 YASAL FOOTER FONKSİYONU (YAN YANA 3 SÜTUN)
 # =============================================================================
 def show_footer():
     st.markdown('<div class="footer-section"></div>', unsafe_allow_html=True)
-    st.subheader("")
     
-    col_f1, col_f2 = st.columns([2, 1])
-    with col_f1:
-        st.markdown("")
-        with st.expander("Gizlilik Politikası ve KVKK Metni"):
+    # 3 Eşit Sütun Oluşturma
+    col_leg1, col_leg2, col_leg3 = st.columns(3)
+    
+    with col_leg1:
+        with st.expander("🔐 Gizlilik ve KVKK"):
             st.write("Verileriniz 6698 sayılı KVKK uyarınca korunmaktadır. DXF dosyaları analiz sonrası silinir.")
-        with st.expander("Mesafeli Satış Sözleşmesi"):
-            st.write("Dijital biletler anında ifa edilen hizmetlerdir. Her bilet 1 analiz hakkı sağlar.")
-        with st.expander("İade ve İptal Politikası"):
-            st.write("Dijital ürünlerde cayma hakkı bulunmamaktadır. Teknik sorunlarda destekle iletişime geçiniz.")
             
-
+    with col_leg2:
+        with st.expander("📜 Satış Sözleşmesi"):
+            st.write("Dijital biletler anında ifa edilen hizmetlerdir. Her bilet 1 analiz hakkı sağlar.")
+            
+    with col_leg3:
+        with st.expander("🔄 İade Politikası"):
+            st.write("Dijital ürünlerde cayma hakkı bulunmamaktadır. Teknik sorunlarda destekle iletişime geçiniz.")
     
     st.divider()
     st.caption("© 2026 Fi-le Yazılım. Tüm hakları saklıdır. Bu uygulama mühendislik ön inceleme aracıdır.")
@@ -93,7 +103,9 @@ def show_footer():
 # 1. GİRİŞ EKRANI (Login)
 # =============================================================================
 if not st.session_state.logged_in:
-    st.title("🏗️ İnşaat Metraj Sistemi Giriş")
+    # Ortalanmış Başlık
+    st.markdown('<h1 class="centered-title">🏗️ İnşaat Metraj Sistemi Giriş</h1>', unsafe_allow_html=True)
+    
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         email_input = st.text_input("E-posta Adresiniz", placeholder="ornek@mail.com")
@@ -106,7 +118,6 @@ if not st.session_state.logged_in:
             else:
                 st.error("Lütfen geçerli bir e-posta adresi girin.")
     
-    # Giriş ekranında yasal metinleri göster
     show_footer()
     st.stop()
 
@@ -143,37 +154,29 @@ with st.sidebar:
 
 st.title("🏗️ Metraj Analiz Paneli")
 
-# Bilet yoksa kilit ekranı
 if not has_credits:
     st.warning("### 🛑 Dosya Yükleme Kilitli")
     st.write("Analiz yapmak için lütfen bilet satın alınız.")
     st.stop()
 
-# Dosya yüklenmemişse bilgilendirme
 if uploaded is None:
     st.info(f"Hoş geldiniz **{st.session_state.user_email}**. Lütfen sol taraftan analiz için DXF dosyasını yükleyin.")
 else:
-    # --- ANALİZ MOTORU --- (Buradaki işlemler mevcut kodunla aynı)
     try:
         with st.spinner("Dosya analiz ediliyor..."):
             with tempfile.NamedTemporaryFile(delete=False, suffix=".dxf") as tmp:
                 tmp.write(uploaded.getvalue())
                 tmp_path = tmp.name
             
-            doc = ezdxf.readfile(tmp_path)
-            # ... (Metraj hesaplama mantığı burada devam eder) ...
-            
+            # Analiz Motoru Mantığı...
             st.success(f"✅ Analiz Hazır: {uploaded.name}")
-            st.metric("Aks Uzunluğu", "Analiz Sonucu m") # Örnek metrik
             
             if st.button("📥 Analizi Onayla ve 1 Bilet Kullan", type="primary"):
                 if use_credit(st.session_state.user_email):
                     st.balloons()
-                    st.success("Rapor indiriliyor...")
             
             os.remove(tmp_path)
     except Exception as e:
         st.error(f"Hata: {e}")
 
-# Panel içinde de alt bilgiyi göster
 show_footer()
