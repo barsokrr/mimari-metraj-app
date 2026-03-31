@@ -213,9 +213,13 @@ if uploaded:
 else:
     st.info(f"Hoş geldiniz **{st.session_state.user_email}**. Başlamak için bir DXF dosyası yükleyin.")
 
+# --- YENİ EKLENEN UYARI VE FOOTER KISMI ---
 st.markdown("""
     <hr style="border:0.1px solid #333; margin-top: 50px;">
-    <div style="text-align: center; color: #666; font-size: 11px;">
+    <div style="text-align: center; color: #888; font-size: 11px; margin-bottom: 15px; max-width: 700px; margin-left: auto; margin-right: auto; line-height: 1.5;">
+        ⚠️ <b>Önemli Not:</b> Hesaplanan metraj değerleri referans amaçlıdır ve %100 kesinlik taşımaz. Orijinal çizimdeki olası eksiklikler, çizim hataları veya filtrelenmeyen/seçilmeyen katmanlardaki duvarlar sisteme dahil edilemez. Lütfen bu kısımları manuel olarak hesaplayıp toplam metraja ekleyiniz.
+    </div>
+    <div style="text-align: center; color: #555; font-size: 11px;">
         © 2026 Fi-le Mimarlık & Yazılım. Tüm hakları saklıdır.
     </div>
 """, unsafe_allow_html=True)
