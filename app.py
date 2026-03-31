@@ -1,7 +1,7 @@
 """
 Mimari Duvar Metraj Uygulaması - Profesyonel SaaS Sürümü
-Geliştirici: Barış Öker - Fi-le Yazılım 
-Özellik: Küçük Fontlu Yasal Metinler ve Ekranın En Altına Sabitlenmiş Footer
+Geliştirici: Barış Öker - Fi-le Mimarlık & Yazılım
+Özellik: 200 TL Fiyat Güncellemesi ve Optimize Edilmiş Arayüz
 """
 import streamlit as st
 import ezdxf
@@ -29,49 +29,44 @@ if 'user_email' not in st.session_state:
     st.session_state.user_email = ""
 
 # =============================================================================
-# 🎨 GELİŞMİŞ CSS (SABİT FOOTER VE KÜÇÜK FONT)
+# 🎨 ÖZEL CSS
 # =============================================================================
 st.markdown("""
     <style>
     .stApp { background-color: #0e1117; }
     
-    /* Giriş Başlığını Ortala */
     .centered-title {
         text-align: center;
-        margin-top: 5vh;
-        margin-bottom: 2rem;
+        margin-top: 5vh !important;
+        margin-bottom: 0px !important;
         font-weight: 700;
     }
     
-    /* Expander Başlık Fontunu Küçült */
-    .st-emotion-cache-p5mtransition {
-        font-size: 13px !important;
-        font-weight: 500 !important;
+    .pushed-up-form {
+        max-width: 400px;
+        margin: -20px auto 0 auto !important;
     }
-    
-    /* Footer Çizgisi ve Alanı */
-    .footer-container {
-        margin-top: 100px;
-        padding-bottom: 100px; /* Sabit footer için boşluk */
-    }
-    
-    /* EKranın En Altına Sabitlenmiş Telif Yazısı */
-    .fixed-footer {
+
+    .footer-fixed-section {
         position: fixed;
         left: 0;
         bottom: 0;
         width: 100%;
         background-color: #0e1117;
-        color: #666;
-        text-align: center;
-        padding: 20px 0;
-        font-size: 11px;
+        padding: 20px 5% 15px 5%;
         border-top: 1px solid #333;
         z-index: 999;
     }
     
-    .profile-card { text-align: center; padding: 1rem; background-color: #1e2130; border-radius: 12px; border: 1px solid #333; margin-bottom: 1.5rem; }
-    .profile-img { border-radius: 50%; width: 90px; height: 90px; border: 3px solid #FF4B4B; margin-bottom: 0.5rem; }
+    .copyright-text {
+        text-align: center;
+        color: #666;
+        font-size: 11px;
+        margin-top: 10px;
+    }
+
+    .profile-card { text-align: center; padding: 1rem; background-color: #1e2130; border-radius: 12px; border: 1px solid #333; }
+    .profile-img { border-radius: 50%; width: 80px; height: 80px; border: 2px solid #FF4B4B; margin-bottom: 0.5rem; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -93,59 +88,51 @@ def use_credit(email):
         return True
     return False
 
-# =============================================================================
-# 🏢 YASAL FOOTER FONKSİYONU
-# =============================================================================
+# --- FOOTER ---
 def show_footer():
-    # Üstteki yasal kutular için konteyner
-    st.markdown('<div class="footer-container"></div>', unsafe_allow_html=True)
-    
-    # 3 Sütunlu Küçük Başlıklı Alan
+    st.markdown('<div class="footer-fixed-section">', unsafe_allow_html=True)
     col_leg1, col_leg2, col_leg3 = st.columns(3)
-    
     with col_leg1:
         with st.expander("🔐 Gizlilik ve KVKK"):
-            st.write("Verileriniz 6698 sayılı KVKK uyarınca korunmaktadır. DXF dosyaları analiz sonrası silinir.")
-            
+            st.write("Verileriniz 6698 sayılı KVKK uyarınca korunmaktadır.")
     with col_leg2:
         with st.expander("📜 Satış Sözleşmesi"):
-            st.write("Dijital biletler anında ifa edilen hizmetlerdir. Her bilet 1 analiz hakkı sağlar.")
-            
+            st.write("Dijital biletler anında ifa edilen hizmetlerdir.")
     with col_leg3:
         with st.expander("🔄 İade Politikası"):
-            st.write("Dijital ürünlerde cayma hakkı bulunmamaktadır. Teknik sorunlarda destekle iletişime geçiniz.")
+            st.write("Dijital ürünlerde cayma hakkı bulunmamaktadır.")
     
-    # EKRANIN EN ALTINA ÇİVİLENMİŞ TELİF YAZISI
     st.markdown("""
-        <div class="fixed-footer">
-            © 2026 Fi-le Mimarlık ve Yazılım. Tüm hakları saklıdır. <br>
-            Bu uygulama mühendislik ön inceleme aracıdır.DESTEK:barsokrr@gmail.com
+        <div class="copyright-text">
+            © 2026 Fi-le Mimarlık & Yazılım. Tüm hakları saklıdır. <br>
+            Destek: barsokrr@gmail.com | Bu uygulama mühendislik ön inceleme aracıdır.
+        </div>
         </div>
     """, unsafe_allow_html=True)
 
 # =============================================================================
-# 1. GİRİŞ EKRANI (Login)
+# 1. GİRİŞ EKRANI
 # =============================================================================
 if not st.session_state.logged_in:
-    st.markdown('<h1 class="centered-title">🏗️ İnşaat Metraj Sistemi Giriş</h1>', unsafe_allow_html=True)
+    st.markdown('<h1 class="centered-title">🏗️ Duvar Metraj Sistemi Giriş</h1>', unsafe_allow_html=True)
     
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        email_input = st.text_input("E-posta Adresiniz", placeholder="ornek@mail.com")
-        if st.button("Giriş Yap", use_container_width=True):
-            if "@" in email_input and "." in email_input:
-                user = get_user_data(email_input)
-                st.session_state.user_email = user["email"]
-                st.session_state.logged_in = True
-                st.rerun()
-            else:
-                st.error("Lütfen geçerli bir e-posta adresi girin.")
+    st.markdown('<div class="pushed-up-form">', unsafe_allow_html=True)
+    email_input = st.text_input("E-posta Adresiniz", placeholder="ornek@mail.com")
+    if st.button("Giriş Yap ve Kontrol Et", use_container_width=True):
+        if "@" in email_input and "." in email_input:
+            user = get_user_data(email_input)
+            st.session_state.user_email = user["email"]
+            st.session_state.logged_in = True
+            st.rerun()
+        else:
+            st.error("Lütfen geçerli bir e-posta adresi girin.")
+    st.markdown('</div>', unsafe_allow_html=True)
     
     show_footer()
     st.stop()
 
 # =============================================================================
-# 2. ANALİZ PANELI (Dashboard)
+# 2. ANALİZ PANELI
 # =============================================================================
 user_info = get_user_data(st.session_state.user_email)
 bilet_sayisi = user_info['credits']
@@ -156,7 +143,7 @@ with st.sidebar:
         <div class="profile-card">
             <img src="https://api.dicebear.com/7.x/bottts/svg?seed={st.session_state.user_email}" class="profile-img">
             <h4>{st.session_state.user_email.split('@')[0]}</h4>
-            <p>🎫 {bilet_sayisi} Bilet</p>
+            <p style="color:#FF4B4B; font-weight:bold;">🎫 {bilet_sayisi} Bilet</p>
         </div>
     """, unsafe_allow_html=True)
     
@@ -165,10 +152,10 @@ with st.sidebar:
         uploaded = st.file_uploader("📁 DXF Dosyası Yükle", type=["dxf"])
         katman_secimi = st.text_input("🧱 Duvar Katmanı", value="DUVAR")
         kat_yuksekligi = st.number_input("📏 Kat Yüksekliği (m)", value=2.85, step=0.01)
-        birim = st.selectbox("📐 Çizim Birimi", ["cm", "mm", "m"], index=0)
     else:
-        st.error("📉 Biletiniz Bulunmuyor")
-        st.link_button("💳 Hemen Bilet Al (99 TL)", "https://paytr.com/link-buraya", use_container_width=True)
+        st.error("📉 Analiz Hakkınız Kalmadı")
+        # FİYAT GÜNCELLEMESİ: 200 TL
+        st.link_button("💳 Hemen Bilet Al (200 TL)", "https://paytr.com/link-buraya", use_container_width=True)
         uploaded = None
 
     if st.button("🚪 Güvenli Çıkış", use_container_width=True):
@@ -178,26 +165,15 @@ with st.sidebar:
 st.title("🏗️ Metraj Analiz Paneli")
 
 if not has_credits:
-    st.warning("### 🛑 Dosya Yükleme Kilitli")
-    st.write("Analiz yapmak için lütfen bilet satın alınız.")
+    st.warning("### 🛑 Bakiyeniz Yetersiz")
+    st.write("Analiz yapabilmek için bilet satın almanız gerekmektedir.")
     st.stop()
 
-if uploaded is None:
-    st.info(f"Hoş geldiniz **{st.session_state.user_email}**. Lütfen sol taraftan analiz için DXF dosyasını yükleyin.")
-else:
-    try:
-        with st.spinner("Dosya analiz ediliyor..."):
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".dxf") as tmp:
-                tmp.write(uploaded.getvalue())
-                tmp_path = tmp.name
-            
-            # Analiz Motoru...
-            st.success(f"✅ Analiz Hazır: {uploaded.name}")
-            if st.button("📥 Analizi Onayla ve 1 Bilet Kullan", type="primary"):
-                if use_credit(st.session_state.user_email):
-                    st.balloons()
-            os.remove(tmp_path)
-    except Exception as e:
-        st.error(f"Hata: {e}")
+if uploaded:
+    st.success(f"✅ Dosya Hazır: {uploaded.name}")
+    if st.button("📥 Analizi Başlat (1 Bilet)", type="primary"):
+        if use_credit(st.session_state.user_email):
+            st.balloons()
+            st.rerun()
 
 show_footer()
