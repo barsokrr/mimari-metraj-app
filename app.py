@@ -1,7 +1,6 @@
 """
-Mimari Duvar Metraj Uygulaması - Profesyonel SaaS Sürümü
-Geliştirici: Barış Öker - Fi-le Mimarlık & Yazılım
-Güncelleme: Analiz Panelinden Yasal Metinler Kaldırıldı
+Mimari Metraj Uygulaması - v2.0
+Özellikler: DXF Analiz, Görsel Plan Çizimi, Blok Sayımı ve Biletleme
 """
 import streamlit as st
 import ezdxf
@@ -28,49 +27,20 @@ if 'logged_in' not in st.session_state:
 if 'user_email' not in st.session_state:
     st.session_state.user_email = ""
 
-# =============================================================================
-# 🎨 PROFESYONEL CSS
-# =============================================================================
+# --- CSS VE TASARIM ---
 st.markdown("""
     <style>
     .stApp { background-color: #0e1117; }
-    
-    .centered-title {
-        text-align: center;
-        margin-top: 5vh !important;
-        margin-bottom: 0px !important;
-        font-weight: 700;
-    }
-    
-    .pushed-up-form {
-        max-width: 400px;
-        margin: -20px auto 0 auto !important;
-    }
-
-    .footer-fixed-section {
-        position: fixed;
-        left: 0;
-        bottom: 0;
-        width: 100%;
-        background-color: #0e1117;
-        padding: 20px 5% 15px 5%;
-        border-top: 1px solid #333;
-        z-index: 999;
-    }
-    
-    .copyright-text {
-        text-align: center;
-        color: #666;
-        font-size: 11px;
-        margin-top: 10px;
-    }
-
+    .centered-title { text-align: center; margin-top: 5vh !important; font-weight: 700; }
+    .pushed-up-form { max-width: 400px; margin: -20px auto 0 auto !important; }
+    .footer-fixed-section { position: fixed; left: 0; bottom: 0; width: 100%; background-color: #0e1117; padding: 20px 5% 15px 5%; border-top: 1px solid #333; z-index: 999; }
+    .copyright-text { text-align: center; color: #666; font-size: 11px; margin-top: 10px; }
     .profile-card { text-align: center; padding: 1rem; background-color: #1e2130; border-radius: 12px; border: 1px solid #333; }
     .profile-img { border-radius: 50%; width: 80px; height: 80px; border: 2px solid #FF4B4B; margin-bottom: 0.5rem; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- YARDIMCI FONKSİYONLAR ---
+# --- ANALİZ FONKSİYONLARI ---
 def get_user_data(email):
     email = email.lower().strip()
     response = supabase.table("users").select("*").eq("email", email).execute()
@@ -88,100 +58,85 @@ def use_credit(email):
         return True
     return False
 
-# --- GİRİŞ EKRANI İÇİN FOOTER ---
-def show_login_footer():
-    st.markdown('<div class="footer-fixed-section">', unsafe_allow_html=True)
-    col_leg1, col_leg2, col_leg3 = st.columns(3)
-    with col_leg1:
-        with st.expander("🔐 Gizlilik ve KVKK"):
-            st.write("Verileriniz 6698 sayılı KVKK uyarınca korunmaktadır.")
-    with col_leg2:
-        with st.expander("📜 Satış Sözleşmesi"):
-            st.write("Dijital biletler anında ifa edilen hizmetlerdir.")
-    with col_leg3:
-        with st.expander("🔄 İade Politikası"):
-            st.write("Dijital ürünlerde cayma hakkı bulunmamaktadır.")
+def process_dxf(file_path, mode, layer_name="DUVAR", height=2.85):
+    doc = ezdxf.readfile(file_path)
+    msp = doc.modelspace()
+    fig, ax = plt.subplots(figsize=(10, 10))
+    fig.patch.set_facecolor('#0e1117')
+    ax.set_facecolor('#0e1117')
     
-    st.markdown("""
-        <div class="copyright-text">
-            © 2026 Fi-le Mimarlık & Yazılım. Tüm hakları saklıdır. <br>
-            Destek: barsokrr@gmail.com | Bu uygulama mühendislik ön inceleme aracıdır.
-        </div>
-        </div>
-    """, unsafe_allow_html=True)
+    # Tüm çizgileri görselleştirme için çiz
+    for e in msp.query('LINE LWPOLYLINE'):
+        color = 'white'
+        if e.dxf.layer == layer_name: color = '#FF4B4B'
+        
+        if e.dxftype() == 'LINE':
+            ax.plot([e.dxf.start.x, e.dxf.end.x], [e.dxf.start.y, e.dxf.end.y], color=color, linewidth=0.5)
+        elif e.dxftype() == 'LWPOLYLINE':
+            pts = e.get_points()
+            ax.plot([p[0] for p in pts], [p[1] for p in pts], color=color, linewidth=0.5)
 
-# =============================================================================
-# 1. GİRİŞ EKRANI
-# =============================================================================
+    ax.axis('off')
+    
+    # Metraj Hesaplama
+    if mode == "🧱 Duvar Metrajı":
+        entities = msp.query(f'*[layer=="{layer_name}"]')
+        total_len = 0
+        for e in entities:
+            if e.dxftype() == 'LINE':
+                total_len += math.sqrt((e.dxf.start.x - e.dxf.end.x)**2 + (e.dxf.start.y - e.dxf.end.y)**2)
+            elif e.dxftype() == 'LWPOLYLINE':
+                pts = e.get_points()
+                for i in range(len(pts)-1):
+                    total_len += math.sqrt((pts[i][0]-pts[i+1][0])**2 + (pts[i][1]-pts[i+1][1])**2)
+        
+        res = pd.DataFrame({"Analiz": ["Toplam Uzunluk", "Alan"], "Sonuç": [round(total_len, 2), round(total_len*height, 2)], "Birim": ["m", "m2"]})
+    else:
+        blocks = msp.query('INSERT')
+        counts = {}
+        for b in blocks: counts[b.dxf.name] = counts.get(b.dxf.name, 0) + 1
+        res = pd.DataFrame(list(counts.items()), columns=["Blok Adı", "Adet"]).sort_values("Adet", ascending=False)
+        
+    return fig, res
+
+# --- GİRİŞ EKRANI ---
 if not st.session_state.logged_in:
     st.markdown('<h1 class="centered-title">🏗️ Duvar Metraj Sistemi Giriş</h1>', unsafe_allow_html=True)
-    
     st.markdown('<div class="pushed-up-form">', unsafe_allow_html=True)
     email_input = st.text_input("E-posta Adresiniz", placeholder="ornek@mail.com")
-    if st.button("Giriş Yap ve Kontrol Et", use_container_width=True):
-        if "@" in email_input and "." in email_input:
+    if st.button("Giriş Yap", use_container_width=True):
+        if "@" in email_input:
             user = get_user_data(email_input)
-            st.session_state.user_email = user["email"]
-            st.session_state.logged_in = True
-            st.rerun()
-        else:
-            st.error("Lütfen geçerli bir e-posta adresi girin.")
+            st.session_state.user_email = user["email"]; st.session_state.logged_in = True; st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
-    
-    show_login_footer()
+    # Footer Expanders...
     st.stop()
 
-# =============================================================================
-# 2. ANALİZ PANELI (Dashboard)
-# =============================================================================
+# --- ANALİZ PANELİ ---
 user_info = get_user_data(st.session_state.user_email)
-bilet_sayisi = user_info['credits']
-has_credits = bilet_sayisi > 0
-
-# Sidebar Düzeni
 with st.sidebar:
-    st.markdown(f"""
-        <div class="profile-card">
-            <img src="https://api.dicebear.com/7.x/bottts/svg?seed={st.session_state.user_email}" class="profile-img">
-            <h4>{st.session_state.user_email.split('@')[0]}</h4>
-            <p style="color:#FF4B4B; font-weight:bold;">🎫 {bilet_sayisi} Bilet</p>
-        </div>
-    """, unsafe_allow_html=True)
-    
+    st.markdown(f'<div class="profile-card"><h4>{st.session_state.user_email}</h4><p>🎫 {user_info["credits"]} Bilet</p></div>', unsafe_allow_html=True)
     st.divider()
-    if has_credits:
-        uploaded = st.file_uploader("📁 DXF Dosyası Yükle", type=["dxf"])
-        katman_secimi = st.text_input("🧱 Duvar Katmanı", value="DUVAR")
-        kat_yuksekligi = st.number_input("📏 Kat Yüksekliği (m)", value=2.85, step=0.01)
+    if user_info['credits'] > 0:
+        uploaded = st.file_uploader("📁 DXF Yükle", type=["dxf"])
+        mode = st.selectbox("🎯 Analiz Tipi", ["🧱 Duvar Metrajı", "🚪 Kapı/Pencere Sayımı"])
+        l_name = st.text_input("🧱 Katman", value="DUVAR") if mode == "🧱 Duvar Metrajı" else "DUVAR"
+        h = st.number_input("📏 Yükseklik", value=2.85)
     else:
-        st.error("📉 Analiz Hakkınız Kalmadı")
-        st.link_button("💳 Hemen Bilet Al (200 TL)", "https://paytr.com/link-buraya", use_container_width=True)
+        st.link_button("💳 Bilet Al (200 TL)", "https://paytr.com/link-buraya")
         uploaded = None
+    if st.button("🚪 Çıkış"): st.session_state.logged_in = False; st.rerun()
 
-    if st.button("🚪 Güvenli Çıkış", use_container_width=True):
-        st.session_state.logged_in = False
-        st.rerun()
-
-# Ana Panel İçeriği
 st.title("🏗️ Metraj Analiz Paneli")
-
-if not has_credits:
-    st.warning("### 🛑 Bakiyeniz Yetersiz")
-    st.write("Analiz yapabilmek için bilet satın almanız gerekmektedir.")
-else:
-    if uploaded:
-        st.success(f"✅ Dosya Hazır: {uploaded.name}")
-        if st.button("📥 Analizi Başlat (1 Bilet)", type="primary"):
-            if use_credit(st.session_state.user_email):
-                st.balloons()
-                st.rerun()
-    else:
-        st.info(f"Hoş geldiniz **{st.session_state.user_email}**. Lütfen sol taraftan bir DXF dosyası yükleyerek başlayın.")
-
-# ALT KISIMDAKİ YASAL METİNLER KALDIRILDI, SADECE TELİF YAZISI BIRAKILDI
-st.markdown("""
-    <hr style="border:0.1px solid #333; margin-top: 50px;">
-    <div style="text-align: center; color: #666; font-size: 11px;">
-        © 2026 Fi-le Yazılım. Tüm hakları saklıdır. Bu uygulama bir mühendislik ön inceleme aracıdır.
-    </div>
-""", unsafe_allow_html=True)
+if uploaded:
+    if st.button("📥 Analizi Başlat (1 Bilet)", type="primary"):
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".dxf") as tmp:
+            tmp.write(uploaded.getvalue()); tmp_path = tmp.name
+        
+        if use_credit(st.session_state.user_email):
+            fig, results = process_dxf(tmp_path, mode, l_name, h)
+            st.balloons()
+            col1, col2 = st.columns([2, 1])
+            with col1: st.pyplot(fig) # PLAN GÖRSELİ BURADA GELİYOR
+            with col2: st.subheader("📊 Sonuçlar"); st.table(results)
+            os.remove(tmp_path)
