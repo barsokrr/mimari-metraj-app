@@ -1,7 +1,7 @@
 """
 Mimari Duvar Metraj Uygulaması - Profesyonel SaaS Sürümü
 Geliştirici: Barış Öker - Fi-le Yazılım 
-Özellik: Ortalanmış Giriş ve Yan Yana Yasal Metinler
+Özellik: Küçük Fontlu Yasal Metinler ve Sabitlenmiş Footer
 """
 import streamlit as st
 import ezdxf
@@ -33,7 +33,7 @@ if 'user_email' not in st.session_state:
     st.session_state.user_email = ""
 
 # =============================================================================
-# 🎨 PROFESYONEL CSS
+# 🎨 ÖZEL CSS (Yazı Boyutları ve Sabit Footer)
 # =============================================================================
 st.markdown("""
     <style>
@@ -46,12 +46,31 @@ st.markdown("""
         font-weight: 700;
     }
     
+    /* Expander Başlık Fontunu Küçült */
+    .st-emotion-cache-p5mtransition {
+        font-size: 13px !important;
+        font-weight: 500 !important;
+    }
+    
+    /* Footer Çizgisi */
+    .footer-section {
+        margin-top: 50px;
+        padding-top: 20px;
+        border-top: 1px solid #333;
+    }
+    
+    /* En Alt Telif Yazısı (Sabitlenmiş Görünüm) */
+    .fixed-footer {
+        position: relative;
+        text-align: center;
+        padding: 40px 0 20px 0;
+        color: #666;
+        font-size: 11px;
+        width: 100%;
+    }
+    
     .profile-card { text-align: center; padding: 1rem; background-color: #1e2130; border-radius: 12px; border: 1px solid #333; margin-bottom: 1.5rem; }
     .profile-img { border-radius: 50%; width: 90px; height: 90px; border: 3px solid #FF4B4B; margin-bottom: 0.5rem; }
-    .footer-section { margin-top: 80px; padding-top: 20px; border-top: 1px solid #333; }
-    
-    /* Expander başlıklarını biraz daha küçük yapalım yan yana sığması için */
-    .st-emotion-cache-p5mtransition { font-size: 14px; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -76,12 +95,12 @@ def use_credit(email):
     return False
 
 # =============================================================================
-# 🏢 YASAL FOOTER FONKSİYONU (YAN YANA 3 SÜTUN)
+# 🏢 YASAL FOOTER FONKSİYONU
 # =============================================================================
 def show_footer():
     st.markdown('<div class="footer-section"></div>', unsafe_allow_html=True)
     
-    # 3 Eşit Sütun Oluşturma
+    # 3 Sütunlu Küçük Başlıklı Alan
     col_leg1, col_leg2, col_leg3 = st.columns(3)
     
     with col_leg1:
@@ -96,14 +115,18 @@ def show_footer():
         with st.expander("🔄 İade Politikası"):
             st.write("Dijital ürünlerde cayma hakkı bulunmamaktadır. Teknik sorunlarda destekle iletişime geçiniz.")
     
-    st.divider()
-    st.caption("© 2026 Fi-le Yazılım. Tüm hakları saklıdır. Bu uygulama mühendislik ön inceleme aracıdır.")
+    # En Alt Telif Yazısı
+    st.markdown("""
+        <div class="fixed-footer">
+            © 2026 Fi-le Yazılım. Tüm hakları saklıdır. <br>
+            Bu uygulama mühendislik ön inceleme aracıdır.
+        </div>
+    """, unsafe_allow_html=True)
 
 # =============================================================================
 # 1. GİRİŞ EKRANI (Login)
 # =============================================================================
 if not st.session_state.logged_in:
-    # Ortalanmış Başlık
     st.markdown('<h1 class="centered-title">🏗️ İnşaat Metraj Sistemi Giriş</h1>', unsafe_allow_html=True)
     
     col1, col2, col3 = st.columns([1, 2, 1])
@@ -168,13 +191,11 @@ else:
                 tmp.write(uploaded.getvalue())
                 tmp_path = tmp.name
             
-            # Analiz Motoru Mantığı...
+            # Analiz Motoru...
             st.success(f"✅ Analiz Hazır: {uploaded.name}")
-            
             if st.button("📥 Analizi Onayla ve 1 Bilet Kullan", type="primary"):
                 if use_credit(st.session_state.user_email):
                     st.balloons()
-            
             os.remove(tmp_path)
     except Exception as e:
         st.error(f"Hata: {e}")
