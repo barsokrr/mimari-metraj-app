@@ -1,7 +1,7 @@
 """
 Mimari Duvar Metraj Uygulaması - Profesyonel SaaS Sürümü
 Geliştirici: Barış Öker - Fi-le Mimarlık & Yazılım
-Özellik: 200 TL Fiyat Güncellemesi ve Optimize Edilmiş Arayüz
+Özellik: 200 TL Fiyat Güncellemesi ve Sabit Footer
 """
 import streamlit as st
 import ezdxf
@@ -18,7 +18,7 @@ try:
     key = st.secrets["supabase"]["key"]
     supabase = create_client(url, key)
 except Exception as e:
-    st.error("Veritabanı anahtarları eksik! Lütfen Streamlit Secrets ayarlarını kontrol edin.")
+    st.error("Veritabanı anahtarları eksik!")
     st.stop()
 
 st.set_page_config(page_title="Duvar Metraj Pro", layout="wide", page_icon="🏗️")
@@ -29,7 +29,7 @@ if 'user_email' not in st.session_state:
     st.session_state.user_email = ""
 
 # =============================================================================
-# 🎨 ÖZEL CSS
+# 🎨 PROFESYONEL CSS
 # =============================================================================
 st.markdown("""
     <style>
@@ -154,7 +154,7 @@ with st.sidebar:
         kat_yuksekligi = st.number_input("📏 Kat Yüksekliği (m)", value=2.85, step=0.01)
     else:
         st.error("📉 Analiz Hakkınız Kalmadı")
-        # FİYAT GÜNCELLEMESİ: 200 TL
+        # BURAYI 200 TL OLARAK GÜNCELLEDİM
         st.link_button("💳 Hemen Bilet Al (200 TL)", "https://paytr.com/link-buraya", use_container_width=True)
         uploaded = None
 
