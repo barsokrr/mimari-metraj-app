@@ -119,7 +119,7 @@ def show_footer():
     st.markdown("""
         <div class="fixed-footer">
             © 2026 Fi-le Yazılım. Tüm hakları saklıdır. <br>
-            Bu uygulama mühendislik ön inceleme aracıdır.
+            Bu uygulama mühendislik ön inceleme aracıdır.DESTEK:barsokrr@gmail.com
         </div>
     """, unsafe_allow_html=True)
 
