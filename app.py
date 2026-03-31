@@ -23,16 +23,35 @@ if 'logged_in' not in st.session_state:
 if 'user_email' not in st.session_state:
     st.session_state.user_email = ""
 
-# --- PROFESYONEL CSS ---
+# --- AYDINLIK TEMA VE ÖZEL CSS ---
 st.markdown("""
     <style>
-    .stApp { background-color: #0e1117; }
-    .centered-title { text-align: center; margin-top: 5vh !important; font-weight: 700; }
+    /* Ana Arka Plan Beyaz */
+    .stApp { background-color: #FFFFFF; color: #31333F; }
+    
+    /* Sol Menü (Sidebar) Beyaz ve Gri Çizgili Modern Tasarım */
+    [data-testid="stSidebar"] {
+        background-color: #F8F9FB;
+        border-right: 1px solid #E6E9EF;
+    }
+    
+    .centered-title { text-align: center; margin-top: 5vh !important; font-weight: 700; color: #1E1E1E; }
     .pushed-up-form { max-width: 400px; margin: -20px auto 0 auto !important; }
-    .footer-fixed-section { position: fixed; left: 0; bottom: 0; width: 100%; background-color: #0e1117; padding: 20px 5% 15px 5%; border-top: 1px solid #333; z-index: 999; }
-    .copyright-text { text-align: center; color: #666; font-size: 11px; margin-top: 10px; }
-    .profile-card { text-align: center; padding: 1rem; background-color: #1e2130; border-radius: 12px; border: 1px solid #333; }
+    
+    /* Profil Kartı Aydınlık Tema */
+    .profile-card { 
+        text-align: center; 
+        padding: 1rem; 
+        background-color: #FFFFFF; 
+        border-radius: 12px; 
+        border: 1px solid #E6E9EF;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
     .profile-img { border-radius: 50%; width: 80px; height: 80px; border: 2px solid #FF4B4B; margin-bottom: 0.5rem; }
+    
+    /* Alt Bilgi */
+    .footer-fixed-section { position: fixed; left: 0; bottom: 0; width: 100%; background-color: #FFFFFF; padding: 20px 5% 15px 5%; border-top: 1px solid #E6E9EF; z-index: 999; }
+    .copyright-text { text-align: center; color: #888; font-size: 11px; margin-top: 10px; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -54,20 +73,6 @@ def use_credit(email):
         return True
     return False
 
-def show_login_footer():
-    st.markdown('<div class="footer-fixed-section">', unsafe_allow_html=True)
-    col_leg1, col_leg2, col_leg3 = st.columns(3)
-    with col_leg1:
-        with st.expander("🔐 Gizlilik ve KVKK"):
-            st.write("Verileriniz 6698 sayılı KVKK uyarınca korunmaktadır.")
-    with col_leg2:
-        with st.expander("📜 Satış Sözleşmesi"):
-            st.write("Dijital biletler anında ifa edilen hizmetlerdir.")
-    with col_leg3:
-        with st.expander("🔄 İade Politikası"):
-            st.write("Dijital ürünlerde cayma hakkı bulunmamaktadır.")
-    st.markdown('<div class="copyright-text">© 2026 Fi-le Mimarlık & Yazılım. Tüm hakları saklıdır. <br> Destek: barsokrr@gmail.com</div></div>', unsafe_allow_html=True)
-
 # =============================================================================
 # 1. GİRİŞ EKRANI
 # =============================================================================
@@ -84,7 +89,6 @@ if not st.session_state.logged_in:
         else:
             st.error("Lütfen geçerli bir e-posta adresi girin.")
     st.markdown('</div>', unsafe_allow_html=True)
-    show_login_footer()
     st.stop()
 
 # =============================================================================
@@ -98,7 +102,7 @@ with st.sidebar:
     st.markdown(f"""
         <div class="profile-card">
             <img src="https://api.dicebear.com/7.x/bottts/svg?seed={st.session_state.user_email}" class="profile-img">
-            <h4>{st.session_state.user_email.split('@')[0]}</h4>
+            <h4 style="color: #31333F;">{st.session_state.user_email.split('@')[0]}</h4>
             <p style="color:#FF4B4B; font-weight:bold;">🎫 {bilet_sayisi} Bilet</p>
         </div>
     """, unsafe_allow_html=True)
@@ -133,9 +137,9 @@ if uploaded:
                 doc = ezdxf.readfile(tmp_path)
                 msp = doc.modelspace()
                 
-                # --- GÖRSELLEŞTİRME ---
-                fig, ax = plt.subplots(figsize=(10, 8), facecolor='#0e1117')
-                ax.set_facecolor('#0e1117')
+                # --- GÖRSELLEŞTİRME (BEYAZ ZEMİN & SİYAH ÇİZGİLER) ---
+                fig, ax = plt.subplots(figsize=(10, 8), facecolor='#FFFFFF')
+                ax.set_facecolor('#FFFFFF')
                 
                 total_length = 0.0
                 entity_count = 0
@@ -144,12 +148,12 @@ if uploaded:
                 for entity in msp:
                     try:
                         layer = getattr(entity.dxf, 'layer', '').upper()
-                        color = "#333333"
-                        lw = 0.5
+                        color = "#D1D1D1" # Diğer çizgiler gri (arka planda kalsın diye)
+                        lw = 0.3
                         
                         is_target = (mode == "🧱 Duvar Metrajı" and hedef_katman in layer)
                         if is_target:
-                            color = "#FF4B4B"
+                            color = "#FF4B4B" # Duvarlar Kırmızı
                             lw = 1.5
 
                         if entity.dxftype() == "LINE":
@@ -172,7 +176,7 @@ if uploaded:
                 ax.set_aspect('equal')
                 ax.axis('off')
                 
-                # --- HESAPLAMA VE SONUÇLAR ---
+                # --- SONUÇLAR ---
                 st.balloons()
                 col_left, col_right = st.columns([2, 1])
                 
@@ -199,11 +203,11 @@ if uploaded:
             except Exception as e:
                 st.error(f"Hata: {str(e)}")
 else:
-    st.info(f"Hoş geldiniz **{st.session_state.user_email}**. Başlamak için bir DXF dosyası yükleyin.")
+    st.info(f"Hoş geldiniz **{st.session_state.user_email}**. Başlamak için sol menüden bir DXF dosyası yükleyin.")
 
 st.markdown("""
-    <hr style="border:0.1px solid #333; margin-top: 50px;">
-    <div style="text-align: center; color: #666; font-size: 11px;">
+    <hr style="border:0.1px solid #E6E9EF; margin-top: 50px;">
+    <div style="text-align: center; color: #888; font-size: 11px;">
         © 2026 Fi-le Mimarlık & Yazılım. Tüm hakları saklıdır.
     </div>
 """, unsafe_allow_html=True)
