@@ -73,13 +73,23 @@ def show_login_footer():
     col_leg1, col_leg2, col_leg3 = st.columns(3)
     with col_leg1:
         with st.expander("Gizlilik ve KVKK"):
-            st.write("Verileriniz 6698 sayılı KVKK uyarınca korunmaktadır.")
+            st.write("""
+                **Veri Sorumlusu:** Fi-le Mimarlık & Yazılım. 
+                E-posta adresiniz sadece sisteme giriş ve bilet tanımlama amacıyla saklanır. 
+                6698 sayılı KVKK uyarınca verileriniz üçüncü taraflarla paylaşılmaz.
+            """)
     with col_leg2:
         with st.expander("Satış Sözleşmesi"):
-            st.write("Dijital biletler anında ifa edilen hizmetlerdir.")
+            st.write("""
+                **Hizmet Teslimi:** Satın alınan 'Metraj Keşif ve Analiz' hakları dijital içerik kapsamındadır. 
+                Ödeme onayına müteakip biletler kullanıcı hesabına tanımlanır.
+            """)
     with col_leg3:
         with st.expander("İade Politikası"):
-            st.write("Dijital ürünlerde cayma hakkı bulunmamaktadır.")
+            st.write("""
+                **Cayma Hakkı:** Mesafeli Satış Sözleşmesi uyarınca, elektronik ortamda anında ifa edilen 
+                hizmetler (dijital analiz hakları) iade ve iptal kapsamı dışındadır.
+            """)
     st.markdown('<div class="copyright-text">© 2026 Fi-le Mimarlık & Yazılım. Tüm hakları saklıdır. <br> Destek: barsokrr@gmail.com</div></div>', unsafe_allow_html=True)
 
 # =============================================================================
@@ -99,7 +109,6 @@ if not st.session_state.logged_in:
         else:
             st.error("Lütfen geçerli bir e-posta adresi girin.")
     
-    # Giriş ekranı bilgilendirme notu
     st.info("ℹ️ **Şifresiz Erişim:** Biletleriniz e-posta adresinize tanımlanır. Şifre belirlemenize gerek kalmadan Supabase altyapısı ile güvenle giriş yapabilirsiniz.")
     st.markdown('</div>', unsafe_allow_html=True)
     show_login_footer()
@@ -116,7 +125,7 @@ with st.sidebar:
     st.markdown(f"""
         <div class="user-info-card">
             <div class="user-name">👤 {st.session_state.user_email.split('@')[0].capitalize()}</div>
-            <div class="user-credits">🎫 {bilet_sayisi} Bilet Mevcut</div>
+            <div class="user-credits">🎫 {bilet_sayisi} Analiz Hakkı Mevcut</div>
         </div>
     """, unsafe_allow_html=True)
     
@@ -130,14 +139,16 @@ with st.sidebar:
             birim = st.selectbox("Çizim Birimi", ["cm", "mm", "m"], index=0)
     else:
         st.error("Analiz Hakkınız Kalmadı")
-        st.link_button("💳 Hemen Bilet Al (200 TL)", "https://paytr.com/link-buraya", use_container_width=True)
+        # PayTR'den alınan güncel link buraya entegre edildi
+        paytr_link = "https://www.paytr.com/link/Hp0l6fm" 
+        st.link_button("💳 Metraj Keşif ve Analiz Paketi Al (208.31 TL)", paytr_link, use_container_width=True)
         uploaded = None
 
     if st.button("Güvenli Çıkış", use_container_width=True):
         st.session_state.logged_in = False
         st.rerun()
 
-st.title("🏗️Metraj Analiz Paneli")
+st.title("🏗️ Metraj Analiz Paneli")
 
 if uploaded:
     if st.button("📥 Analizi Başlat (1 Bilet)", type="primary"):
@@ -216,22 +227,14 @@ if uploaded:
 else:
     st.info(f"Hoş geldiniz **{st.session_state.user_email}**. Başlamak için bir DXF dosyası yükleyin.")
 
-# --- BİLGİLENDİRME, SORUMLULUK VE FOOTER ---
+# --- BİLGİLENDİRME VE SORUMLULUK ---
 st.markdown("""
     <hr style="border:0.1px solid #333; margin-top: 50px;">
-    
-    <div style="text-align: center; color: #64748B; font-size: 11px; margin-bottom: 20px; max-width: 800px; margin-left: auto; margin-right: auto; line-height: 1.4;">
-        🔐 <b>Hesap Yönetimi:</b> Sistemimiz şifre zorunluluğu olmadan e-posta tabanlı doğrulama ile çalışır. 
-        Kullanıcı verileriniz ve bilet haklarınız <b>Supabase</b> bulut altyapısında güvenli bir şekilde takip edilmektedir.
-    </div>
-
     <div style="text-align: center; color: #888; font-size: 11px; margin-bottom: 15px; max-width: 750px; margin-left: auto; margin-right: auto; line-height: 1.5; background-color: #1e2130; padding: 12px; border-radius: 8px; border: 1px solid #333;">
-        ⚠️ <b>Önemli Not:</b> Hesaplanan metraj değerleri referans amaçlıdır ve kesinlik taşımaz. Orijinal çizimdeki eksik kısımlar, 
-        seçilmeyen katmanlar veya çizim hatalarından kaynaklanan metrajlar toplam sonuca dahil edilemez. 
-        Lütfen bu kısımları manuel olarak hesaplayıp toplam metraja ekleyiniz.
+        ⚠️ <b>Önemli Not:</b> Hesaplanan metraj değerleri referans amaçlıdır. Orijinal çizimdeki eksik kısımlar veya 
+        çizim hatalarından kaynaklanan farklar sonuca dahil edilemez. Lütfen bu kısımları manuel kontrol ediniz.
     </div>
-
-    <div style="text-align: center; color: #555; font-size: 11px;">
+    <div style="text-align: center; color: #555; font-size: 11px; margin-bottom: 100px;">
         © 2026 Fi-le Mimarlık & Yazılım. Tüm hakları saklıdır.
     </div>
 """, unsafe_allow_html=True)
