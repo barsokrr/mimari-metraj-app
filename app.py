@@ -5,6 +5,7 @@ import pandas as pd
 import math
 import tempfile
 import os
+import time
 from supabase import create_client
 
 # --- VERİTABANI VE OTURUM AYARLARI ---
@@ -26,14 +27,9 @@ if 'user_email' not in st.session_state:
 # --- PROFESYONEL CSS ---
 st.markdown("""
     <style>
-    /* Genel Tema */
     .stApp { background-color: #0e1117; }
-    
-    /* Başlık ve Form */
     .centered-title { text-align: center; margin-top: 5vh !important; font-weight: 700; color: white; }
     .pushed-up-form { max-width: 400px; margin: -20px auto 0 auto !important; }
-    
-    /* Profil Bilgi Kartı */
     .user-info-card {
         padding: 1.2rem;
         background-color: #1e2130;
@@ -43,8 +39,6 @@ st.markdown("""
     }
     .user-name { color: #ffffff; font-weight: 600; font-size: 1.1rem; margin-bottom: 4px; }
     .user-credits { color: #FF4B4B; font-weight: bold; font-size: 0.9rem; }
-
-    /* Alt Bilgi */
     .footer-fixed-section { position: fixed; left: 0; bottom: 0; width: 100%; background-color: #0e1117; padding: 20px 5% 15px 5%; border-top: 1px solid #333; z-index: 999; }
     .copyright-text { text-align: center; color: #666; font-size: 11px; margin-top: 10px; }
     </style>
@@ -68,29 +62,40 @@ def use_credit(email):
         return True
     return False
 
+# =============================================================================
+# 0. PAYTR OTOMATİK BİLET TANIMLAMA (WEBHOOK MANTIĞI)
+# =============================================================================
+query_params = st.query_params
+if query_params.get("status") == "success":
+    if st.session_state.logged_in:
+        user_data = get_user_data(st.session_state.user_email)
+        new_credits = user_data["credits"] + 1
+        try:
+            supabase.table("users").update({"credits": new_credits}).eq("email", st.session_state.user_email).execute()
+            st.balloons()
+            st.success(f"🎉 Ödeme Onaylandı! 1 Analiz Hakkı Tanımlandı. Yeni Bakiye: {new_credits}")
+            st.query_params.clear()
+            time.sleep(2)
+            st.rerun()
+        except Exception as e:
+            st.error(f"Hata: {str(e)}")
+    else:
+        st.warning("Ödeme başarılı! Biletin tanımlanması için lütfen giriş yapın.")
+
+# --- FOOTER FONKSİYONU ---
 def show_login_footer():
     st.markdown('<div class="footer-fixed-section">', unsafe_allow_html=True)
     col_leg1, col_leg2, col_leg3 = st.columns(3)
     with col_leg1:
         with st.expander("Gizlilik ve KVKK"):
-            st.write("""
-                **Veri Sorumlusu:** Fi-le Mimarlık & Yazılım. 
-                E-posta adresiniz sadece sisteme giriş ve bilet tanımlama amacıyla saklanır. 
-                6698 sayılı KVKK uyarınca verileriniz üçüncü taraflarla paylaşılmaz.
-            """)
+            st.write("E-posta adresiniz sadece sisteme giriş ve bilet tanımlama amacıyla saklanır.")
     with col_leg2:
         with st.expander("Satış Sözleşmesi"):
-            st.write("""
-                **Hizmet Teslimi:** Satın alınan 'Metraj Keşif ve Analiz' hakları dijital içerik kapsamındadır. 
-                Ödeme onayına müteakip biletler kullanıcı hesabına tanımlanır.
-            """)
+            st.write("Satın alınan analiz hakları dijital içerik kapsamındadır ve anında tanımlanır.")
     with col_leg3:
         with st.expander("İade Politikası"):
-            st.write("""
-                **Cayma Hakkı:** Mesafeli Satış Sözleşmesi uyarınca, elektronik ortamda anında ifa edilen 
-                hizmetler (dijital analiz hakları) iade ve iptal kapsamı dışındadır.
-            """)
-    st.markdown('<div class="copyright-text">© 2026 Fi-le Mimarlık & Yazılım. Tüm hakları saklıdır. <br> Destek: barsokrr@gmail.com</div></div>', unsafe_allow_html=True)
+            st.write("Dijital hizmetler (analiz hakları) Mesafeli Satış Sözleşmesi gereği iade kapsamı dışındadır.")
+    st.markdown('<div class="copyright-text">© 2026 Fi-le Mimarlık & Yazılım. Tüm hakları saklıdır.</div></div>', unsafe_allow_html=True)
 
 # =============================================================================
 # 1. GİRİŞ EKRANI
@@ -109,13 +114,13 @@ if not st.session_state.logged_in:
         else:
             st.error("Lütfen geçerli bir e-posta adresi girin.")
     
-    st.info("ℹ️ **Şifresiz Erişim:** Biletleriniz e-posta adresinize tanımlanır. Şifre belirlemenize gerek kalmadan Supabase altyapısı ile güvenle giriş yapabilirsiniz.")
+    st.info("ℹ️ **Şifresiz Erişim:** Biletleriniz e-postanıza tanımlanır. Şifre gerekmez.")
     st.markdown('</div>', unsafe_allow_html=True)
     show_login_footer()
     st.stop()
 
 # =============================================================================
-# 2. ANALİZ PANELİ (Dashboard)
+# 2. ANALİZ PANELİ
 # =============================================================================
 user_info = get_user_data(st.session_state.user_email)
 bilet_sayisi = user_info['credits']
@@ -139,9 +144,8 @@ with st.sidebar:
             birim = st.selectbox("Çizim Birimi", ["cm", "mm", "m"], index=0)
     else:
         st.error("Analiz Hakkınız Kalmadı")
-        # PayTR'den alınan güncel link buraya entegre edildi
         paytr_link = "https://www.paytr.com/link/Hp0l6fm" 
-        st.link_button("💳 Metraj Keşif ve Analiz Paketi Al (208.31 TL)", paytr_link, use_container_width=True)
+        st.link_button("💳 Bilet Satın Al (208.31 TL)", paytr_link, use_container_width=True)
         uploaded = None
 
     if st.button("Güvenli Çıkış", use_container_width=True):
@@ -173,7 +177,6 @@ if uploaded:
                         layer = getattr(entity.dxf, 'layer', '').upper()
                         color = "#444444"
                         lw = 0.5
-                        
                         is_target = (mode == "Duvar Metrajı" and hedef_katman in layer)
                         if is_target:
                             color = "#FF4B4B"
@@ -199,42 +202,30 @@ if uploaded:
                 ax.set_aspect('equal')
                 ax.axis('off')
                 
-                st.balloons()
                 col_left, col_right = st.columns([2, 1])
-                
                 with col_left:
                     st.pyplot(fig, use_container_width=True)
-                
                 with col_right:
                     if mode == "Duvar Metrajı":
                         birim_carpani = {"mm": 1000.0, "cm": 100.0, "m": 1.0}.get(birim, 100.0)
                         aks_uzunluk = (total_length / 2.0) / birim_carpani
                         toplam_alan = aks_uzunluk * kat_yuksekligi
-                        
                         st.metric("Aks Uzunluğu", f"{aks_uzunluk:.2f} m")
                         st.metric("Toplam Alan", f"{toplam_alan:.2f} m²")
-                        st.metric("Obje Sayısı", f"{entity_count} adet")
                     else:
                         blocks = msp.query('INSERT')
-                        counts = {}
-                        for b in blocks: counts[b.dxf.name] = counts.get(b.dxf.name, 0) + 1
-                        df_res = pd.DataFrame(list(counts.items()), columns=["Blok Adı", "Adet"]).sort_values("Adet", ascending=False)
-                        st.table(df_res)
+                        counts = {b.dxf.name: counts.get(b.dxf.name, 0) + 1 for b in blocks}
+                        st.table(pd.DataFrame(list(counts.items()), columns=["Blok Adı", "Adet"]))
 
                 os.remove(tmp_path)
             except Exception as e:
                 st.error(f"Hata: {str(e)}")
 else:
-    st.info(f"Hoş geldiniz **{st.session_state.user_email}**. Başlamak için bir DXF dosyası yükleyin.")
+    st.info(f"Hoş geldiniz **{st.session_state.user_email}**. Analiz için dosya yükleyin.")
 
-# --- BİLGİLENDİRME VE SORUMLULUK ---
 st.markdown("""
     <hr style="border:0.1px solid #333; margin-top: 50px;">
-    <div style="text-align: center; color: #888; font-size: 11px; margin-bottom: 15px; max-width: 750px; margin-left: auto; margin-right: auto; line-height: 1.5; background-color: #1e2130; padding: 12px; border-radius: 8px; border: 1px solid #333;">
-        ⚠️ <b>Önemli Not:</b> Hesaplanan metraj değerleri referans amaçlıdır. Orijinal çizimdeki eksik kısımlar veya 
-        çizim hatalarından kaynaklanan farklar sonuca dahil edilemez. Lütfen bu kısımları manuel kontrol ediniz.
-    </div>
-    <div style="text-align: center; color: #555; font-size: 11px; margin-bottom: 100px;">
-        © 2026 Fi-le Mimarlık & Yazılım. Tüm hakları saklıdır.
+    <div style="text-align: center; color: #888; font-size: 11px; margin-bottom: 100px;">
+        ⚠️ Hesaplanan değerler referans amaçlıdır. © 2026 Fi-le Mimarlık & Yazılım.
     </div>
 """, unsafe_allow_html=True)
