@@ -63,24 +63,30 @@ def use_credit(email):
     return False
 
 # =============================================================================
-# 0. PAYTR OTOMATİK BİLET TANIMLAMA (WEBHOOK MANTIĞI)
+# 0. PAYTR OTOMATİK BİLET TANIMLAMA
 # =============================================================================
 query_params = st.query_params
 if query_params.get("status") == "success":
-    if st.session_state.logged_in:
-        user_data = get_user_data(st.session_state.user_email)
-        new_credits = user_data["credits"] + 1
+    # Önce session'daki emaili kontrol et, yoksa manuel giriş isteyeceğiz
+    target_email = st.session_state.user_email.lower().strip()
+    
+    if target_email:
         try:
-            supabase.table("users").update({"credits": new_credits}).eq("email", st.session_state.user_email).execute()
+            user_data = get_user_data(target_email)
+            new_credits = user_data["credits"] + 1
+            supabase.table("users").update({"credits": new_credits}).eq("email", target_email).execute()
+            
             st.balloons()
             st.success(f"🎉 Ödeme Onaylandı! 1 Analiz Hakkı Tanımlandı. Yeni Bakiye: {new_credits}")
+            
+            # Parametreleri temizle ve sayfayı yenile
             st.query_params.clear()
             time.sleep(2)
             st.rerun()
         except Exception as e:
-            st.error(f"Hata: {str(e)}")
+            st.error(f"Bilet tanımlanırken hata oluştu: {str(e)}")
     else:
-        st.warning("Ödeme başarılı! Biletin tanımlanması için lütfen giriş yapın.")
+        st.warning("⚠️ Ödeme başarılı ancak biletin tanımlanması için önce giriş yapmalısınız.")
 
 # --- FOOTER FONKSİYONU ---
 def show_login_footer():
@@ -150,6 +156,7 @@ with st.sidebar:
 
     if st.button("Güvenli Çıkış", use_container_width=True):
         st.session_state.logged_in = False
+        st.session_state.user_email = ""
         st.rerun()
 
 st.title("🏗️ Metraj Analiz Paneli")
@@ -214,12 +221,17 @@ if uploaded:
                         st.metric("Toplam Alan", f"{toplam_alan:.2f} m²")
                     else:
                         blocks = msp.query('INSERT')
-                        counts = {b.dxf.name: counts.get(b.dxf.name, 0) + 1 for b in blocks}
+                        counts = {}
+                        for b in blocks:
+                            name = b.dxf.name
+                            counts[name] = counts.get(name, 0) + 1
                         st.table(pd.DataFrame(list(counts.items()), columns=["Blok Adı", "Adet"]))
 
                 os.remove(tmp_path)
             except Exception as e:
                 st.error(f"Hata: {str(e)}")
+        else:
+            st.error("Yetersiz analiz hakkı!")
 else:
     st.info(f"Hoş geldiniz **{st.session_state.user_email}**. Analiz için dosya yükleyin.")
 
