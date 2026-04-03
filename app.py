@@ -6,6 +6,7 @@ import math
 import tempfile
 import os
 import time
+import io  # Excel verisini bellek üzerinde tutmak için gerekli
 from supabase import create_client
 
 # --- VERİTABANI VE OTURUM AYARLARI ---
@@ -67,19 +68,14 @@ def use_credit(email):
 # =============================================================================
 query_params = st.query_params
 if query_params.get("status") == "success":
-    # Önce session'daki emaili kontrol et, yoksa manuel giriş isteyeceğiz
     target_email = st.session_state.user_email.lower().strip()
-    
     if target_email:
         try:
             user_data = get_user_data(target_email)
             new_credits = user_data["credits"] + 1
             supabase.table("users").update({"credits": new_credits}).eq("email", target_email).execute()
-            
             st.balloons()
             st.success(f"🎉 Ödeme Onaylandı! 1 Analiz Hakkı Tanımlandı. Yeni Bakiye: {new_credits}")
-            
-            # Parametreleri temizle ve sayfayı yenile
             st.query_params.clear()
             time.sleep(2)
             st.rerun()
@@ -212,20 +208,52 @@ if uploaded:
                 col_left, col_right = st.columns([2, 1])
                 with col_left:
                     st.pyplot(fig, use_container_width=True)
+                
                 with col_right:
+                    # --- Excel Hazırlık Alanı ---
+                    excel_data = []
+
                     if mode == "Duvar Metrajı":
                         birim_carpani = {"mm": 1000.0, "cm": 100.0, "m": 1.0}.get(birim, 100.0)
                         aks_uzunluk = (total_length / 2.0) / birim_carpani
                         toplam_alan = aks_uzunluk * kat_yuksekligi
+                        
                         st.metric("Aks Uzunluğu", f"{aks_uzunluk:.2f} m")
                         st.metric("Toplam Alan", f"{toplam_alan:.2f} m²")
+                        
+                        excel_data = [
+                            {"Kalem": "Aks Uzunluğu", "Değer": round(aks_uzunluk, 2), "Birim": "m"},
+                            {"Kalem": "Toplam Alan", "Değer": round(toplam_alan, 2), "Birim": "m²"},
+                            {"Kalem": "Kat Yüksekliği", "Değer": kat_yuksekligi, "Birim": "m"}
+                        ]
                     else:
                         blocks = msp.query('INSERT')
                         counts = {}
                         for b in blocks:
                             name = b.dxf.name
                             counts[name] = counts.get(name, 0) + 1
-                        st.table(pd.DataFrame(list(counts.items()), columns=["Blok Adı", "Adet"]))
+                        
+                        results_df = pd.DataFrame(list(counts.items()), columns=["Blok Adı", "Adet"])
+                        st.table(results_df)
+                        
+                        for index, row in results_df.iterrows():
+                            excel_data.append({"Kalem": row["Blok Adı"], "Değer": row["Adet"], "Birim": "Adet"})
+
+                    # --- Excel Dosyası Oluşturma ---
+                    if excel_data:
+                        output_df = pd.DataFrame(excel_data)
+                        buffer = io.BytesIO()
+                        with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
+                            output_df.to_excel(writer, index=False, sheet_name='Metraj Sonuclari')
+                        
+                        st.divider()
+                        st.download_button(
+                            label="📊 Analizi Excel Olarak İndir",
+                            data=buffer.getvalue(),
+                            file_name=f"metraj_analizi_{int(time.time())}.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            use_container_width=True
+                        )
 
                 os.remove(tmp_path)
             except Exception as e:
