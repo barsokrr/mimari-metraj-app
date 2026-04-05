@@ -103,7 +103,7 @@ def show_login_footer():
 # 1. GİRİŞ EKRANI
 # =============================================================================
 if not st.session_state.logged_in:
-    st.markdown('<h1 class="centered-title">🏗️ Duvar Metraj Sistemi Giriş</h1>', unsafe_allow_html=True)
+    st.markdown('<h1 class="centered-title">🏗️Mimari Keşif ve Metraj Analizi Giriş</h1>', unsafe_allow_html=True)
     st.markdown('<div class="pushed-up-form">', unsafe_allow_html=True)
     email_input = st.text_input("E-posta Adresiniz", placeholder="ornek@mail.com")
     
@@ -147,7 +147,7 @@ with st.sidebar:
     else:
         st.error("Analiz Hakkınız Kalmadı")
         paytr_link = "https://www.paytr.com/link/Hp0l6fm" 
-        st.link_button("💳 Bilet Satın Al (208.31 TL)", paytr_link, use_container_width=True)
+        st.link_button("💳 Bilet Satın Al (550 TL)", paytr_link, use_container_width=True)
         uploaded = None
 
     if st.button("Güvenli Çıkış", use_container_width=True):
