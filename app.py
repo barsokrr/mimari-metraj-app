@@ -147,7 +147,7 @@ with st.sidebar:
     else:
         st.error("Analiz Hakkınız Kalmadı")
         paytr_link = "https://www.paytr.com/link/Hp0l6fm" 
-        st.link_button("💳 Bilet Satın Al (550 TL)", paytr_link, use_container_width=True)
+        st.link_button("💳 Bilet Satın Al (249 TL)", paytr_link, use_container_width=True)
         uploaded = None
 
     if st.button("Güvenli Çıkış", use_container_width=True):
