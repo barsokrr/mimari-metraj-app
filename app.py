@@ -261,11 +261,11 @@ if uploaded:
         else:
             st.error("Yetersiz analiz hakkı!")
 else:
-    st.info(f"Hoş geldiniz **{st.session_state.user_email}**. Analiz için dosya yükleyin.")
+    st.info(f"Hoş geldiniz **{st.session_state.user_email}**. Analiz için dosya yükleyin.Satın alma işlemi tamamlandığında analiz paneli açılacaktır")
 
 st.markdown("""
     <hr style="border:0.1px solid #333; margin-top: 50px;">
     <div style="text-align: center; color: #888; font-size: 11px; margin-bottom: 100px;">
-        ⚠️ Hesaplanan değerler referans amaçlıdır. © 2026 Fi-le Mimarlık & Yazılım.
+        ⚠️ © 2026 Fi-le Mimarlık & Yazılım.
     </div>
 """, unsafe_allow_html=True)
