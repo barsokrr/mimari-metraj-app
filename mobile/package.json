@@ -1,0 +1,23 @@
+{
+  "name": "mimari-metraj-native",
+  "version": "1.0.0",
+  "private": true,
+  "description": "iOS/Android mağaza kabuğu — yayına aldığınız Streamlit uygulamasını WebView ile açar.",
+  "scripts": {
+    "setup:native": "npm install && npx cap sync",
+    "bootstrap:native": "npm install && npx cap add android && npx cap add ios && npx cap sync",
+    "ios:pod": "cd ios/App && pod install",
+    "sync": "cap sync",
+    "open:android": "cap open android",
+    "open:ios": "cap open ios",
+    "doctor": "cap doctor"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.2.0",
+    "@capacitor/core": "^6.2.0",
+    "@capacitor/ios": "^6.2.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.2.0"
+  }
+}

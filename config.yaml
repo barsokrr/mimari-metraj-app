@@ -1,3 +1,5 @@
+# Bu dosya mevcut app.py akışında kullanılmıyor (giriş Supabase + oturum ile).
+# streamlit-authenticator veya başka bir araç için şablondur.
 credentials:
   usernames:
     admin:

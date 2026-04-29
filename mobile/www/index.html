@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Duvar Metraj Pro</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: system-ui, sans-serif;
+      background: #0e1117;
+      color: #e6e6e6;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 1.5rem;
+      padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+    }
+    p { max-width: 22rem; line-height: 1.5; }
+    code { color: #ff6b6b; font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+  <div>
+    <p>Bu ekran yalnızca yedektir. Uygulama <code>capacitor.config.json</code> içindeki
+    <strong>server.url</strong> adresinden yüklenir (HTTPS Streamlit).</p>
+    <p><code>server.url</code> henüz ayarlanmadıysa bu sayfa görünebilir.</p>
+  </div>
+</body>
+</html>

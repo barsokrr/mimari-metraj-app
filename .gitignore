@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+.Python
+.streamlit/secrets.toml
+# Kök dizinde yanlışlıkla oluşturulan gizli anahtarlar (Streamlit asıl olarak .streamlit/secrets.toml okur)
+secrets.toml
+mobile/node_modules/
+.DS_Store

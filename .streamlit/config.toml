@@ -1,0 +1,23 @@
+[server]
+# Tüm IPv4 arayüzleri (Cursor gömülü tarayıcı + localhost/127.0.0.1 uyumu için).
+# Yalnızca yerel geliştirme; internete açık sunucuda address sıkılaştırın.
+address = "0.0.0.0"
+port = 8501
+# Bazı gömülü tarayıcılarda boş sayfa / yükleme takılmasını azaltır (yalnızca yerel).
+enableXsrfProtection = false
+# MB cinsinden; varsayılan 200. Büyük DXF dosyaları için yükseltildi.
+maxUploadSize = 500
+# WebSocket mesaj üst sınırı (MB). maxUploadSize'tan küçük kalırsa büyük yüklemeler tamamlanmayabilir.
+maxMessageSize = 500
+
+[browser]
+# Cursor Simple Browser / tutarlı Origin için; tarayıcıda tercihen bu host kullanılsın.
+serverAddress = "127.0.0.1"
+
+[theme]
+base = "light"
+primaryColor = "#0f766e"
+backgroundColor = "#f0f4f3"
+secondaryBackgroundColor = "#ffffff"
+textColor = "#0f172a"
+font = "serif"

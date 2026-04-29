@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Duvar Metraj Pro</string>
+    <string name="title_activity_main">Duvar Metraj Pro</string>
+    <string name="package_name">com.filemimarlik.metrajpro</string>
+    <string name="custom_url_scheme">com.filemimarlik.metrajpro</string>
+</resources>

@@ -1180,6 +1180,18 @@ def _clear_payment_status_query_param() -> None:
             pass
 
 
+def _is_ios_client() -> bool:
+    """Best-effort iOS client detection for App Store-safe behavior toggles."""
+    ua = ""
+    try:
+        headers = getattr(st.context, "headers", None)
+        if headers:
+            ua = str(headers.get("user-agent", "")).lower()
+    except Exception:
+        ua = ""
+    return any(token in ua for token in ("iphone", "ipad", "ipod", "ios"))
+
+
 def use_credit(email):
     user = get_user_data(email)
     if user["credits"] > 0:
@@ -1191,7 +1203,8 @@ def use_credit(email):
 
 
 query_params = st.query_params
-if query_params.get("status") == "success":
+IOS_APP_MODE = _is_ios_client()
+if (not IOS_APP_MODE) and query_params.get("status") == "success":
     target_email = (st.session_state.get("user_email") or "").lower().strip()
     if target_email:
         try:
@@ -1264,7 +1277,7 @@ if not st.session_state.logged_in:
 
 user_info = get_sidebar_user_info(st.session_state.user_email)
 bilet_sayisi = user_info["credits"]
-has_credits = bilet_sayisi > 0
+has_credits = IOS_APP_MODE or (bilet_sayisi > 0)
 _kullanici_goster = html.escape(st.session_state.user_email.strip())
 _kredi_goster = html.escape(str(bilet_sayisi))
 
@@ -1309,6 +1322,22 @@ with st.sidebar:
         paytr_link = "https://www.paytr.com/link/Hp0l6fm"
         st.link_button("Satın Al (249 TL)", paytr_link, width="stretch")
 
+    if IOS_APP_MODE:
+        st.caption("iOS sürümünde uygulama içi harici ödeme bağlantısı kapalıdır.")
+
+    with st.expander("Hesap İşlemleri"):
+        delete_confirm = st.checkbox("Hesabımı ve kredi bilgilerimi kalıcı olarak sil")
+        if st.button("Hesabımı Sil", width="stretch", type="secondary", disabled=not delete_confirm):
+            try:
+                supabase.table("users").delete().eq("email", st.session_state.user_email).execute()
+                st.session_state.logged_in = False
+                st.session_state.user_email = ""
+                _invalidate_sidebar_user_cache()
+                st.success("Hesabınız silindi.")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Hesap silinirken hata oluştu: {e!s}")
+
     if st.button("Güvenli Çıkış", width="stretch"):
         st.session_state.logged_in = False
         st.session_state.user_email = ""
@@ -1327,7 +1356,7 @@ with st.container(key="metraj_root_tabs"):
 
         if uploaded:
             if st.button("📥 Analizi Başlat (1 Bilet)", type="primary"):
-                if use_credit(st.session_state.user_email):
+                if IOS_APP_MODE or use_credit(st.session_state.user_email):
                     try:
                         with st.spinner("DXF işleniyor; büyük dosyalarda birkaç dakika sürebilir…"):
                             metrics = run_dxf_analysis(

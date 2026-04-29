@@ -1,4 +1,4 @@
-
+# mimari-metraj-app — app.py için gerekli çalışma zamanı
 streamlit>=1.28.0
 ezdxf>=1.1.0
 matplotlib>=3.7.0
