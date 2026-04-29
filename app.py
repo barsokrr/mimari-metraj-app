@@ -1168,18 +1168,6 @@ def get_sidebar_user_info(email: str) -> dict:
     return data
 
 
-def _clear_payment_status_query_param() -> None:
-    """Ödeme callback'inde status=success tekrarlanmasın diye sorgu parametresini kaldır."""
-    try:
-        if "status" in st.query_params:
-            st.query_params.pop("status", None)
-    except Exception:
-        try:
-            st.query_params.clear()
-        except Exception:
-            pass
-
-
 def _is_ios_client() -> bool:
     """Best-effort iOS client detection for App Store-safe behavior toggles."""
     ua = ""
@@ -1202,27 +1190,7 @@ def use_credit(email):
     return False
 
 
-query_params = st.query_params
 IOS_APP_MODE = _is_ios_client()
-if (not IOS_APP_MODE) and query_params.get("status") == "success":
-    target_email = (st.session_state.get("user_email") or "").lower().strip()
-    if target_email:
-        try:
-            user_data = get_user_data(target_email)
-            new_credits = user_data["credits"] + 1
-            supabase.table("users").update({"credits": new_credits}).eq("email", target_email).execute()
-            _invalidate_sidebar_user_cache()
-            st.balloons()
-            st.success(f"🎉 Ödeme Onaylandı! 1 Analiz Hakkı Tanımlandı. Yeni Bakiye: {new_credits}")
-            _clear_payment_status_query_param()
-            time.sleep(2)
-            st.rerun()
-        except Exception as e:
-            st.error(f"Bilet tanımlanırken hata oluştu: {str(e)}")
-            _clear_payment_status_query_param()
-    else:
-        st.warning("⚠️ Ödeme başarılı ancak biletin tanımlanması için önce giriş yapmalısınız.")
-        _clear_payment_status_query_param()
 
 
 def show_login_footer():
@@ -1268,7 +1236,7 @@ if not st.session_state.logged_in:
 
         st.caption(
             "**Önemli:** Girdiğiniz e-posta adresi, hesabınızı tanımlamak amacıyla veri tabanında (Supabase) saklanır. "
-            "Uygulama içi satın alınan analiz hakları yalnızca bu e-postaya tanımlanır. Kredilerinizin doğru hesabınıza "
+            "Analiz hakları yalnızca bu e-postaya tanımlanır. Kredilerinizin doğru hesabınıza "
             "atanması için lütfen her zaman aynı e-posta adresiyle giriş yapın."
         )
 
@@ -1319,8 +1287,7 @@ with st.sidebar:
         )
     else:
         st.error("Analiz hakkınız kalmadı.")
-        paytr_link = "https://www.paytr.com/link/Hp0l6fm"
-        st.link_button("Satın Al (249 TL)", paytr_link, width="stretch")
+        st.info("Bu sürümde uygulama içi harici ödeme bağlantısı bulunmuyor.")
 
     if IOS_APP_MODE:
         st.caption("iOS sürümünde uygulama içi harici ödeme bağlantısı kapalıdır.")
@@ -1375,7 +1342,7 @@ with st.container(key="metraj_root_tabs"):
         else:
             st.info(
                 f"Hoş geldiniz **{st.session_state.user_email}**. Analiz için kenar çubuğundan DXF yükleyin. "
-                "Satın alma sonrası haklarınız otomatik tanımlanır."
+                "Dosya yüklendikten sonra analizi başlatabilirsiniz."
             )
 
     with tab_yapi_insaat:
