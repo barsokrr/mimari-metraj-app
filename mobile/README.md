@@ -65,6 +65,20 @@ Kök dizinde `icon.png` (1024×1024) ve `splash.png` hazırlayıp [Capacitor Ass
 - **Apple:** “Yalnızca web sitesi” kabuğu bazen reddedilebilir. Uygulamanın metraj aracı olarak net faydası, ekran görüntüleri ve gerekirse küçük native iyileştirmeler (ör. paylaşım, bildirim) incelemeyi kolaylaştırır.
 - **Ödeme:** Harici ödeme (PayTR linki) ile ilgili mağaza kurallarını güncel metinlerden kontrol edin; gerektiğinde uygulama içi açıklama metni ekleyin.
 
+### iOS 4.2 (Minimum Functionality) için eklenen native özellikler
+
+Bu projede iOS kabuğuna aşağıdaki yerel davranışlar eklendi:
+
+- **Native pull-to-refresh:** Ekranı aşağı çekince içerik yeniden yüklenir.
+- **Native quick actions:** Sağ alttaki yerel butondan `Refresh` ve `Share App` aksiyonları açılır.
+- **Native Share Sheet:** Uygulama bağlantısı iOS paylaşım menüsü ile paylaşılabilir.
+- **Ağ durumu takibi:** Cihaz offline olduğunda üstte yerel bir uyarı banner'ı gösterilir.
+
+Bu özellikler `BridgeViewController.swift` ile sağlanır ve `Main.storyboard` içinde başlangıç denetleyicisi olarak bağlanmıştır.
+
+- **Giriş / yeni pencere (App Review 4.x):** Capacitor varsayılanında `window.open` hedefleri `UIApplication.shared.open` ile Safari’ye gider. `CapacitorInAppNavigationHook.swift` yalnızca **`createWebViewWith`** yolunu swizzle eder; böylece popup’lar **aynı WKWebView** içinde yüklenir. Ana çerçeve için `decidePolicyFor` değiştirilmez (yanlış iptal **boş ekran / 2.1** riski). OAuth yönlendirmeleri için `capacitor.config.json` içinde `server.allowNavigation` ile bilinen ana makineler listelenmiştir.
+- **iOS kullanıcı aracısı:** `ios.appendUserAgent` değeri (`MetrajProNative/iOS`) Streamlit tarafında `app.py` içindeki iOS davranış anahtarı için kullanılır (iPad masaüstü modu dahil).
+
 ## Sorun giderme
 
 - `npx cap doctor` ortamı kontrol eder.

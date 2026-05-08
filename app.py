@@ -223,15 +223,13 @@ def inject_global_styles() -> None:
         font-family: "Times New Roman", Times, serif !important;
         color: #000000 !important;
     }}
-    [data-testid="stSidebar"] [data-testid="stFileUploader"] section[data-testid="stFileUploaderDropzone"] *,
-    [data-testid="stSidebar"] [data-testid="stFileUploader"] section[data-testid="stFileUploaderDropzone"] span {{
-        font-family: "Times New Roman", Times, serif !important;
+    [data-testid="stSidebar"] [data-testid="stFileUploader"] section[data-testid="stFileUploaderDropzone"] * {{
         color: #000000 !important;
     }}
-    [data-testid="stSidebar"] [data-testid="stFileUploader"] section[data-testid="stFileUploaderDropzone"] button,
-    [data-testid="stSidebar"] [data-testid="stFileUploader"] section[data-testid="stFileUploaderDropzone"] button * {{
+    [data-testid="stSidebar"] [data-testid="stFileUploader"] section[data-testid="stFileUploaderDropzone"] p,
+    [data-testid="stSidebar"] [data-testid="stFileUploader"] section[data-testid="stFileUploaderDropzone"] small,
+    [data-testid="stSidebar"] [data-testid="stFileUploader"] section[data-testid="stFileUploaderDropzone"] button {{
         font-family: "Times New Roman", Times, serif !important;
-        color: #dc2626 !important;
     }}
     [data-testid="stSidebar"] [data-testid="stFileUploader"] section[data-testid="stFileUploaderDropzone"] svg {{
         color: #000000 !important;
@@ -1141,12 +1139,25 @@ inject_global_styles()
 
 def get_user_data(email):
     email = email.lower().strip()
-    response = supabase.table("users").select("*").eq("email", email).execute()
-    if len(response.data) == 0:
-        new_user = {"email": email, "credits": 0}
-        supabase.table("users").insert(new_user).execute()
-        return new_user
-    return response.data[0]
+    local_users = st.session_state.setdefault("_local_users", {})
+    try:
+        response = supabase.table("users").select("*").eq("email", email).execute()
+        if len(response.data) == 0:
+            new_user = {"email": email, "credits": 0}
+            supabase.table("users").insert(new_user).execute()
+            return new_user
+        return response.data[0]
+    except Exception:
+        # Supabase bağlantısı yoksa girişi bloklamamak için oturum içi yerel kullanıcıya düş.
+        if not st.session_state.get("_db_fallback_notice_shown", False):
+            st.warning(
+                "Veritabanına bağlanılamadığı için geçici yerel modda çalışılıyor. "
+                "Bu modda kredi bilgileri yalnızca bu oturumda saklanır."
+            )
+            st.session_state["_db_fallback_notice_shown"] = True
+        if email not in local_users:
+            local_users[email] = {"email": email, "credits": 1}
+        return local_users[email]
 
 
 def _invalidate_sidebar_user_cache() -> None:
@@ -1169,7 +1180,7 @@ def get_sidebar_user_info(email: str) -> dict:
 
 
 def _is_ios_client() -> bool:
-    """Best-effort iOS client detection for App Store-safe behavior toggles."""
+    """iOS mağaza kabuğu: Capacitor `ios.appendUserAgent` ile işaretlenir (iPad masaüstü Safari UA'sında bile güvenilir)."""
     ua = ""
     try:
         headers = getattr(st.context, "headers", None)
@@ -1177,20 +1188,32 @@ def _is_ios_client() -> bool:
             ua = str(headers.get("user-agent", "")).lower()
     except Exception:
         ua = ""
-    return any(token in ua for token in ("iphone", "ipad", "ipod", "ios"))
+    if "metrajpronative/ios" in ua:
+        return True
+    return any(token in ua for token in ("iphone", "ipad", "ipod"))
 
 
 def use_credit(email):
     user = get_user_data(email)
     if user["credits"] > 0:
         new_credits = user["credits"] - 1
-        supabase.table("users").update({"credits": new_credits}).eq("email", email).execute()
+        try:
+            supabase.table("users").update({"credits": new_credits}).eq("email", email).execute()
+        except Exception:
+            email_l = email.lower().strip()
+            local_users = st.session_state.setdefault("_local_users", {})
+            local_users[email_l] = {"email": email_l, "credits": new_credits}
         _invalidate_sidebar_user_cache()
         return True
     return False
 
 
 IOS_APP_MODE = _is_ios_client()
+
+
+def _footer_link_attrs() -> str:
+    """iOS mağaza WebView: target=_blank dış tarayıcıyı tetikleyebilir; aynı WebView'da kalsın."""
+    return 'rel="noopener noreferrer"' if IOS_APP_MODE else 'target="_blank" rel="noopener noreferrer"'
 
 
 def show_login_footer():
@@ -1206,7 +1229,7 @@ def show_login_footer():
         with st.expander("İade Politikası"):
             st.write("Dijital hizmetler (analiz hakları) Mesafeli Satış Sözleşmesi gereği iade kapsamı dışındadır.")
     st.markdown(
-        '<div class="copyright-text">© 2026 <a href="https://filemimarlik.com" target="_blank" rel="noopener noreferrer">Fi-le Mimarlık & Yazılım</a>. Tüm hakları saklıdır.</div></div>',
+        f'<div class="copyright-text">© 2026 <a href="https://filemimarlik.com" {_footer_link_attrs()}>Fi-le Mimarlık & Yazılım</a>. Tüm hakları saklıdır.</div></div>',
         unsafe_allow_html=True,
     )
 
@@ -1239,6 +1262,11 @@ if not st.session_state.logged_in:
             "Analiz hakları yalnızca bu e-postaya tanımlanır. Kredilerinizin doğru hesabınıza "
             "atanması için lütfen her zaman aynı e-posta adresiyle giriş yapın."
         )
+        if IOS_APP_MODE:
+            st.info(
+                "**iOS uygulaması:** Arayüz sunucudan yüklenir; stabil **Wi‑Fi veya hücresel veri** gerekir. "
+                "Beyaz ekranda kalırsanız uygulamayı kapatıp yeniden açın veya birkaç saniye bekleyin."
+            )
 
     show_login_footer()
     st.stop()
@@ -1297,13 +1325,26 @@ with st.sidebar:
         if st.button("Hesabımı Sil", width="stretch", type="secondary", disabled=not delete_confirm):
             try:
                 supabase.table("users").delete().eq("email", st.session_state.user_email).execute()
+                st.session_state.setdefault("_local_users", {}).pop(
+                    st.session_state.user_email.lower().strip(), None
+                )
                 st.session_state.logged_in = False
                 st.session_state.user_email = ""
                 _invalidate_sidebar_user_cache()
                 st.success("Hesabınız silindi.")
                 st.rerun()
             except Exception as e:
-                st.error(f"Hesap silinirken hata oluştu: {e!s}")
+                st.session_state.setdefault("_local_users", {}).pop(
+                    st.session_state.user_email.lower().strip(), None
+                )
+                st.session_state.logged_in = False
+                st.session_state.user_email = ""
+                _invalidate_sidebar_user_cache()
+                st.warning(
+                    "Veritabanına erişilemediği için yerel oturum hesabı silindi. "
+                    f"Ayrıntı: {e!s}"
+                )
+                st.rerun()
 
     if st.button("Güvenli Çıkış", width="stretch"):
         st.session_state.logged_in = False
@@ -1355,9 +1396,9 @@ with st.container(key="metraj_root_tabs"):
         st.info("YAPI İŞLERİ ELEKTRİK — Bu bölüm yakında eklenecek.")
 
 st.markdown(
-    """
+    f"""
     <hr class="page-footer-hr" />
-    <div class="page-footer-note">© 2026 <a href="https://filemimarlik.com" target="_blank" rel="noopener noreferrer">Fi-le Mimarlık & Yazılım</a>.</div>
+    <div class="page-footer-note">© 2026 <a href="https://filemimarlik.com" {_footer_link_attrs()}>Fi-le Mimarlık & Yazılım</a>.</div>
     """,
     unsafe_allow_html=True,
 )

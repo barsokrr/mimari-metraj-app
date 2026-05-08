@@ -4,11 +4,28 @@
   "webDir": "www",
   "server": {
     "url": "https://mimari-metraj-app.streamlit.app",
-    "cleartext": false
+    "cleartext": false,
+    "allowNavigation": [
+      "mimari-metraj-app.streamlit.app",
+      "share.streamlit.io",
+      "streamlit.app",
+      "accounts.google.com",
+      "oauth2.googleapis.com",
+      "www.googleapis.com",
+      "www.google.com",
+      "login.microsoftonline.com",
+      "github.com",
+      "supabase.co",
+      "auth.supabase.co",
+      "cdn.jsdelivr.net",
+      "fonts.googleapis.com",
+      "fonts.gstatic.com"
+    ]
   },
   "ios": {
     "contentInset": "automatic",
-    "allowsLinkPreview": false
+    "allowsLinkPreview": false,
+    "appendUserAgent": "MetrajProNative/iOS"
   },
   "android": {
     "allowMixedContent": false
